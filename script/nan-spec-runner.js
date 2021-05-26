@@ -52,7 +52,7 @@ async function main () {
     '-lc++abi'
   ].join(' ');
 
-  if (process.platform !== 'win32') {
+  if (process.platform === 'linux') {
     env.CC = cc;
     env.CFLAGS = cxxflags;
     env.CXX = cxx;
