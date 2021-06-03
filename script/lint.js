@@ -108,7 +108,7 @@ const LINTERS = [{
     });
     const formatter = await eslint.loadFormatter();
     let successCount = 0;
-    const results = await eslint.lintFiles(filenames);
+    const results = (await eslint.lintFiles(filenames)).sort((a, b) => a.filePath.localeCompare(b.filePath));
     for (const result of results) {
       successCount += result.errorCount === 0 ? 1 : 0;
       if (opts.verbose && result.errorCount === 0 && result.warningCount === 0) {

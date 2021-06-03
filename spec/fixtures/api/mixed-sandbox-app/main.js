@@ -12,7 +12,7 @@ if (process.argv.includes('--app-enable-sandbox')) {
 
 let currentWindowSandboxed = false;
 
-app.whenReady().then(() => {
+void app.whenReady().then(() => {
   function testWindow (isSandboxed, callback) {
     currentWindowSandboxed = isSandboxed;
     const currentWindow = new BrowserWindow({
@@ -22,7 +22,7 @@ app.whenReady().then(() => {
         sandbox: isSandboxed
       }
     });
-    currentWindow.loadURL('about:blank');
+    void currentWindow.loadURL('about:blank');
     currentWindow.webContents.once('devtools-opened', () => {
       if (isSandboxed) {
         argv.sandboxDevtools = true;
