@@ -76,7 +76,7 @@ executors:
         description: "macOS executor size"
         default: m2.large
         type: enum
-        enum: ["medium", "m2.large"]
+        enum: ["m2.medium", "m2.large"]
     macos:
       xcode: "12.5.0"
     resource_class: << parameters.size >>
@@ -1991,7 +1991,7 @@ jobs:
   osx-testing-x64-gn-check:
     executor:
       name: macos
-      size: medium
+      size: m2.medium
     environment:
       <<: *env-machine-mac
       <<: *env-testing-build
@@ -2083,7 +2083,7 @@ jobs:
   mas-testing-x64-gn-check:
     executor:
       name: macos
-      size: medium
+      size: m2.medium
     environment:
       <<: *env-machine-mac
       <<: *env-mas
@@ -2313,7 +2313,7 @@ jobs:
   osx-testing-x64-tests:
     executor:
       name: macos
-      size: medium
+      size: m2.medium
     environment:
       <<: *env-mac-large
       <<: *env-stack-dumping
@@ -2331,7 +2331,7 @@ jobs:
   mas-testing-x64-tests:
     executor:
       name: macos
-      size: medium
+      size: m2.medium
     environment:
       <<: *env-mac-large
       <<: *env-stack-dumping
