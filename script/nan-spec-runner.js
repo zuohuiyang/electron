@@ -31,10 +31,8 @@ async function main () {
   const cxx = path.resolve(clangDir, 'clang++');
   const ld = path.resolve(clangDir, 'lld');
 
-  // TODO(ckerr) this is cribbed from read obj/electron/electron_app.ninja.
-  // Maybe it would be better to have this script literally open up that
-  // file and pull cflags_cc from it instead of using bespoke code here?
-  // I think it's unlikely to work; but if it does, it would be more futureproof
+  // fPIC is needed for linux ia32:
+  // https://github.com/nodejs/node-gyp/blob/4d036526c5347ad6fb0394993bda05f8260f7ae4/addon.gypi#L180-L181
   const cxxflags = [
     '-std=c++14',
     '-nostdinc++',

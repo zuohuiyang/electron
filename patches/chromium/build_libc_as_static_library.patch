@@ -3,8 +3,14 @@ From: VerteDinde <keeleymhammond@gmail.com>
 Date: Wed, 12 May 2021 13:19:19 -0700
 Subject: build_libc++_as_static_library
 
-Build libc++ as static library to compile and pass
-nan tests
+Chromium uses a reimplementation of the C++ standard library called libc++, rather than C++'s
+standard runtime library. This causes incompatibilities when trying to build libstdc++.
+For example, incompatibilities with the SharedArrayBuffer in nan. We can address these
+incompatibilities by building with libc++ in Electron, instead of libstdc++.
+
+To ensure that we're always building with the correct version of libc++, this patch builds
+libc++ as a static library, which allows us to bundle the libc++ object files
+in an archive file included in each Electron version.
 
 diff --git a/buildtools/third_party/libc++/BUILD.gn b/buildtools/third_party/libc++/BUILD.gn
 index 65f6e8585ad374ad59e7670babfedd2fbdfbaa43..7928a03447347f441e1e7dfc43f7a8e475eb120b 100644
