@@ -2314,6 +2314,19 @@ jobs:
       <<: *env-apple-silicon
     <<: *steps-tests
 
+  osx-testing-arm64-halt:  
+    executor: apple-silicon
+    environment:
+      <<: *env-mac-large
+      <<: *env-stack-dumping
+      <<: *env-apple-silicon
+    steps:
+      - run: echo "Testing halt on arm64"
+      - run:
+          name: Shortcircuit build
+          command: circleci step halt
+      - run: echo "This step should be skipped"
+
   mas-testing-x64-tests:
     executor:
       name: macos
@@ -2445,6 +2458,8 @@ workflows:
       - osx-testing-x64-tests:
           requires:
             - osx-testing-x64
+
+      - osx-testing-arm64-halt            
 
       - osx-testing-arm64:
           requires:
