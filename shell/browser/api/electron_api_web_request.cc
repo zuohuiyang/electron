@@ -94,17 +94,34 @@ struct UserData : public base::SupportsUserData::Data {
   WebRequest* data;
 };
 
-// Test whether the URL of |request| matches |patterns|.
-bool MatchesFilterCondition(extensions::WebRequestInfo* info,
-                            const std::set<URLPattern>& patterns) {
-  if (patterns.empty())
-    return true;
-
-  for (const auto& pattern : patterns) {
-    if (pattern.MatchesURL(info->url))
-      return true;
+extensions::WebRequestResourceType ParseResourceType(const std::string& value) {
+  if (value == "mainFrame") {
+    return extensions::WebRequestResourceType::MAIN_FRAME;
+  } else if (value == "subFrame") {
+    return extensions::WebRequestResourceType::SUB_FRAME;
+  } else if (value == "stylesheet") {
+    return extensions::WebRequestResourceType::STYLESHEET;
+  } else if (value == "script") {
+    return extensions::WebRequestResourceType::SCRIPT;
+  } else if (value == "image") {
+    return extensions::WebRequestResourceType::IMAGE;
+  } else if (value == "font") {
+    return extensions::WebRequestResourceType::FONT;
+  } else if (value == "object") {
+    return extensions::WebRequestResourceType::OBJECT;
+  } else if (value == "xhr") {
+    return extensions::WebRequestResourceType::XHR;
+  } else if (value == "ping") {
+    return extensions::WebRequestResourceType::PING;
+  } else if (value == "cspReport") {
+    return extensions::WebRequestResourceType::CSP_REPORT;
+  } else if (value == "media") {
+    return extensions::WebRequestResourceType::MEDIA;
+  } else if (value == "webSocket") {
+    return extensions::WebRequestResourceType::WEB_SOCKET;
+  } else {
+    return extensions::WebRequestResourceType::OTHER;
   }
-  return false;
 }
 
 // Convert HttpResponseHeaders to V8.
@@ -243,17 +260,45 @@ void ReadFromResponse(v8::Isolate* isolate,
 
 gin::WrapperInfo WebRequest::kWrapperInfo = {gin::kEmbedderNativeGin};
 
-WebRequest::SimpleListenerInfo::SimpleListenerInfo(
-    std::set<URLPattern> patterns_,
-    SimpleListener listener_)
-    : url_patterns(std::move(patterns_)), listener(listener_) {}
+WebRequest::RequestFilter::RequestFilter(
+    std::set<URLPattern> url_patterns_,
+    std::set<extensions::WebRequestResourceType> types_)
+    : url_patterns(std::move(url_patterns_)), types(std::move(types_)) {}
+WebRequest::RequestFilter::RequestFilter(const RequestFilter&) = default;
+WebRequest::RequestFilter::RequestFilter() = default;
+WebRequest::RequestFilter::~RequestFilter() = default;
+
+bool WebRequest::RequestFilter::MatchesURL(const GURL& url) const {
+  if (url_patterns.empty())
+    return true;
+
+  for (const auto& pattern : url_patterns) {
+    if (pattern.MatchesURL(url))
+      return true;
+  }
+  return false;
+}
+
+bool WebRequest::RequestFilter::MatchesType(
+    extensions::WebRequestResourceType type) const {
+  return types.empty() || types.find(type) != types.end();
+}
+
+bool WebRequest::RequestFilter::MatchesRequest(
+    extensions::WebRequestInfo* info) const {
+  return MatchesURL(info->url) && MatchesType(info->web_request_type);
+}
+
+WebRequest::SimpleListenerInfo::SimpleListenerInfo(RequestFilter filter_,
+                                                   SimpleListener listener_)
+    : filter(std::move(filter_)), listener(listener_) {}
 WebRequest::SimpleListenerInfo::SimpleListenerInfo() = default;
 WebRequest::SimpleListenerInfo::~SimpleListenerInfo() = default;
 
 WebRequest::ResponseListenerInfo::ResponseListenerInfo(
-    std::set<URLPattern> patterns_,
+    RequestFilter filter_,
     ResponseListener listener_)
-    : url_patterns(std::move(patterns_)), listener(listener_) {}
+    : filter(std::move(filter_)), listener(listener_) {}
 WebRequest::ResponseListenerInfo::ResponseListenerInfo() = default;
 WebRequest::ResponseListenerInfo::~ResponseListenerInfo() = default;
 
@@ -388,8 +433,8 @@ void WebRequest::SetListener(Event event,
                              gin::Arguments* args) {
   v8::Local<v8::Value> arg;
 
-  // { urls }.
-  std::set<std::string> filter_patterns;
+  // { urls, types }.
+  std::set<std::string> filter_patterns, filter_types;
   gin::Dictionary dict(args->isolate());
   if (args->GetNext(&arg) && !arg->IsFunction()) {
     // Note that gin treats Function as Dictionary when doing conversions, so we
@@ -400,20 +445,32 @@ void WebRequest::SetListener(Event event,
         args->ThrowTypeError("Parameter 'filter' must have property 'urls'.");
         return;
       }
+      dict.Get("types", &filter_types);
       args->GetNext(&arg);
     }
   }
 
-  std::set<URLPattern> patterns;
+  RequestFilter filter;
+
   for (const std::string& filter_pattern : filter_patterns) {
     URLPattern pattern(URLPattern::SCHEME_ALL);
     const URLPattern::ParseResult result = pattern.Parse(filter_pattern);
     if (result == URLPattern::ParseResult::kSuccess) {
-      patterns.insert(pattern);
+      filter.url_patterns.insert(pattern);
     } else {
       const char* error_type = URLPattern::GetParseResultString(result);
       args->ThrowTypeError("Invalid url pattern " + filter_pattern + ": " +
                            error_type);
+      return;
+    }
+  }
+
+  for (const std::string& filter_type : filter_types) {
+    auto type = ParseResourceType(filter_type);
+    if (type != extensions::WebRequestResourceType::OTHER) {
+      filter.types.insert(type);
+    } else {
+      args->ThrowTypeError("Invalid type " + filter_type);
       return;
     }
   }
@@ -429,7 +486,7 @@ void WebRequest::SetListener(Event event,
   if (listener.is_null())
     listeners->erase(event);
   else
-    (*listeners)[event] = {std::move(patterns), std::move(listener)};
+    (*listeners)[event] = {std::move(filter), std::move(listener)};
 }
 
 template <typename... Args>
@@ -441,7 +498,7 @@ void WebRequest::HandleSimpleEvent(SimpleEvent event,
     return;
 
   const auto& info = iter->second;
-  if (!MatchesFilterCondition(request_info, info.url_patterns))
+  if (!info.filter.MatchesRequest(request_info))
     return;
 
   v8::Isolate* isolate = JavascriptEnvironment::GetIsolate();
@@ -462,7 +519,7 @@ int WebRequest::HandleResponseEvent(ResponseEvent event,
     return net::OK;
 
   const auto& info = iter->second;
-  if (!MatchesFilterCondition(request_info, info.url_patterns))
+  if (!info.filter.MatchesRequest(request_info))
     return net::OK;
 
   callbacks_[request_info->id] = std::move(callback);

@@ -75,8 +75,8 @@ describe('webRequest module', () => {
       await expect(ajax(defaultURL)).to.eventually.be.rejectedWith('404');
     });
 
-    it('can filter URLs', async () => {
-      const filter = { urls: [defaultURL + 'filter/*'] };
+    it('can filter URLs and types', async () => {
+      const filter: Electron.WebRequestFilter = { urls: [defaultURL + 'filter/*'], types: ['xhr'] };
       ses.webRequest.onBeforeRequest(filter, (details, callback) => {
         callback({ cancel: true });
       });

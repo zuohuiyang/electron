@@ -125,20 +125,35 @@ class WebRequest : public gin::Wrappable<WebRequest>, public WebRequestAPI {
   template <typename T>
   void OnListenerResult(uint64_t id, T out, v8::Local<v8::Value> response);
 
-  struct SimpleListenerInfo {
+  struct RequestFilter {
     std::set<URLPattern> url_patterns;
+    std::set<extensions::WebRequestResourceType> types;
+
+    RequestFilter(std::set<URLPattern>,
+                  std::set<extensions::WebRequestResourceType>);
+    RequestFilter(const RequestFilter&);
+    RequestFilter();
+    ~RequestFilter();
+
+    bool MatchesURL(const GURL& url) const;
+    bool MatchesType(extensions::WebRequestResourceType type) const;
+    bool MatchesRequest(extensions::WebRequestInfo* info) const;
+  };
+
+  struct SimpleListenerInfo {
+    RequestFilter filter;
     SimpleListener listener;
 
-    SimpleListenerInfo(std::set<URLPattern>, SimpleListener);
+    SimpleListenerInfo(RequestFilter, SimpleListener);
     SimpleListenerInfo();
     ~SimpleListenerInfo();
   };
 
   struct ResponseListenerInfo {
-    std::set<URLPattern> url_patterns;
+    RequestFilter filter;
     ResponseListener listener;
 
-    ResponseListenerInfo(std::set<URLPattern>, ResponseListener);
+    ResponseListenerInfo(RequestFilter, ResponseListener);
     ResponseListenerInfo();
     ~ResponseListenerInfo();
   };
