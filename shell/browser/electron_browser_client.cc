@@ -1364,6 +1364,14 @@ bool ElectronBrowserClient::WillCreateURLLoaderFactory(
     auto* web_request_api = extensions::BrowserContextKeyedAPIFactory<
         extensions::WebRequestAPI>::Get(browser_context);
 
+    // If this is called by GetURLLoaderFactory(), frame_host is always nullptr
+    // so we need to handle that case.
+    bool is_navigation =
+        type ==
+        content::ContentBrowserClient::URLLoaderFactoryType::kNavigation;
+    if (is_navigation && !frame_host)
+      return false;
+
     DCHECK(web_request_api);
     bool use_proxy_for_web_request =
         web_request_api->MaybeProxyURLLoaderFactory(
