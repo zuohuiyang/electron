@@ -97,6 +97,7 @@
   chai.config.truncateThreshold = 0;
 
   const runner = mocha.run(() => {
+    console.log("RUNNER DONE!!!!!");
     // Ensure the callback is called after runner is defined
     setTimeout(() => {
       ipcRenderer.send('process.exit', runner.failures)

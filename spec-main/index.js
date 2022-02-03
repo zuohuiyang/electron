@@ -140,6 +140,7 @@ app.whenReady().then(async () => {
   chai.config.truncateThreshold = 0;
 
   const runner = mocha.run(cb);
+  console.log('DONE RUNNING MOCHA!!!!');
 }).catch((err) => {
   console.error('An error occurred while running the spec-main spec runner');
   console.error(err);

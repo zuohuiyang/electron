@@ -120,6 +120,7 @@ app.whenReady().then(async function () {
     }
   });
   window.on('unresponsive', function () {
+    console.log('HEY WINDOW IS UNRESPONSIVE!!!!!');
     const chosen = dialog.showMessageBox(window, {
       type: 'warning',
       buttons: ['Close', 'Keep Waiting'],
@@ -129,6 +130,7 @@ app.whenReady().then(async function () {
     if (chosen === 0) window.destroy();
   });
   window.webContents.on('crashed', function () {
+    console.log('HEY Renderer process crashed!!!!!');
     console.error('Renderer process crashed');
     process.exit(1);
   });
