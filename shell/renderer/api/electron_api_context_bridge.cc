@@ -429,30 +429,21 @@ void ProxyFunctionWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
     v8::MaybeLocal<v8::Value> maybe_return_value;
     bool did_error = false;
-    v8::Local<v8::Value> error_message;
+    v8::Local<v8::String> error_message;
+
     {
       v8::TryCatch try_catch(args.isolate());
       maybe_return_value = func->Call(func_owning_context, func,
                                       proxied_args.size(), proxied_args.data());
       if (try_catch.HasCaught()) {
         did_error = true;
-        v8::Local<v8::Value> exception = try_catch.Exception();
-
-        const char err_msg[] =
-            "An unknown exception occurred in the isolated context, an error "
-            "occurred but a valid exception was not thrown.";
-
-        if (!exception->IsNull() && exception->IsObject()) {
-          v8::MaybeLocal<v8::Value> maybe_message =
-              exception.As<v8::Object>()->Get(
-                  func_owning_context,
-                  gin::ConvertToV8(args.isolate(), "message"));
-
-          if (!maybe_message.ToLocal(&error_message) ||
-              !error_message->IsString()) {
-            error_message = gin::StringToV8(args.isolate(), err_msg);
-          }
+        v8::Local<v8::Message> message = try_catch.Message();
+        if (!message.IsEmpty()) {
+          error_message = message->Get();
         } else {
+          const char err_msg[] =
+              "An unknown exception occurred in the isolated context, an error "
+              "occurred but a valid exception was not thrown.";
           error_message = gin::StringToV8(args.isolate(), err_msg);
         }
       }
@@ -460,8 +451,7 @@ void ProxyFunctionWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
     if (did_error) {
       v8::Context::Scope calling_context_scope(calling_context);
-      args.isolate()->ThrowException(
-          v8::Exception::Error(error_message.As<v8::String>()));
+      args.isolate()->ThrowException(v8::Exception::Error(error_message));
       return;
     }
 
