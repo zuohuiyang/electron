@@ -3586,6 +3586,27 @@ describe('BrowserWindow module', () => {
         await emittedOnce(w, 'leave-html-full-screen');
       });
     });
+
+    it('pressing ESC should emit the leave-html-full-screen event', async () => {
+      const w = new BrowserWindow({
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false
+        }
+      });
+
+      await w.loadURL('about:blank');
+
+      const enterFSWindow = emittedOnce(w, 'enter-html-full-screen');
+      const enterFSWC = emittedOnce(w.webContents, 'enter-html-full-screen');
+      await w.webContents.executeJavaScript('document.body.webkitRequestFullscreen()', true);
+      await Promise.all([enterFSWindow, enterFSWC]);
+
+      const leaveFSWindow = emittedOnce(w, 'leave-html-full-screen');
+      const leaveFSWC = emittedOnce(w.webContents, 'leave-html-full-screen');
+      w.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+      await Promise.all([leaveFSWindow, leaveFSWC]);
+    });
   });
 
   describe('parent window', () => {

@@ -476,31 +476,17 @@ describe('<webview> tag', function () {
     });
 
     it('pressing ESC should emit the leave-html-full-screen event', async () => {
-      const w = new BrowserWindow({
-        show: false,
-        webPreferences: {
-          webviewTag: true,
-          nodeIntegration: true,
-          contextIsolation: false
-        }
-      });
-
-      const didAttachWebview = emittedOnce(w.webContents, 'did-attach-webview');
-      w.loadFile(path.join(fixtures, 'pages', 'webview-did-attach-event.html'));
-
-      const [, webContents] = await didAttachWebview;
+      const [w, webview] = await loadWebViewWindow();
 
       const enterFSWindow = emittedOnce(w, 'enter-html-full-screen');
-      const enterFSWebview = emittedOnce(webContents, 'enter-html-full-screen');
-      await webContents.executeJavaScript('document.getElementById("div").requestFullscreen()', true);
-      await enterFSWindow;
-      await enterFSWebview;
+      const enterFSWebview = emittedOnce(webview, 'enter-html-full-screen');
+      await webview.executeJavaScript('document.getElementById("div").requestFullscreen()', true);
+      await Promise.all([enterFSWindow, enterFSWebview]);
 
       const leaveFSWindow = emittedOnce(w, 'leave-html-full-screen');
-      const leaveFSWebview = emittedOnce(webContents, 'leave-html-full-screen');
-      webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
-      await leaveFSWindow;
-      await leaveFSWebview;
+      const leaveFSWebview = emittedOnce(webview, 'leave-html-full-screen');
+      webview.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+      await Promise.all([leaveFSWindow, leaveFSWebview]);
     });
   });
 
