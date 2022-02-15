@@ -449,7 +449,23 @@ describe('<webview> tag', function () {
       const parentFullscreen = emittedOnce(ipcMain, 'fullscreenchange');
       await webview.executeJavaScript('document.getElementById("div").requestFullscreen()', true);
       await parentFullscreen;
+
       expect(await w.webContents.executeJavaScript('isIframeFullscreen()')).to.be.true();
+    });
+
+    ifit(process.platform === 'darwin')('should make parent frame element fullscreen too', async () => {
+      const [w, webview] = await loadWebViewWindow();
+      expect(await w.webContents.executeJavaScript('isIframeFullscreen()')).to.be.false();
+
+      const parentFullscreen = emittedOnce(ipcMain, 'fullscreenchange');
+      const enterHTMLFS = emittedOnce(w.webContents, 'enter-html-full-screen');
+      const leaveHTMLFS = emittedOnce(w.webContents, 'leave-html-full-screen');
+
+      await webview.executeJavaScript('document.getElementById("div").requestFullscreen()', true);
+      expect(await w.webContents.executeJavaScript('isIframeFullscreen()')).to.be.true();
+
+      await webview.executeJavaScript('document.exitFullscreen()');
+      await Promise.all([enterHTMLFS, leaveHTMLFS, parentFullscreen]);
     });
 
     // FIXME(zcbenz): Fullscreen events do not work on Linux.
@@ -505,8 +521,8 @@ describe('<webview> tag', function () {
       const leaveFSWindow = emittedOnce(w, 'leave-html-full-screen');
       const leaveFSWebview = emittedOnce(webContents, 'leave-html-full-screen');
       webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
-      await leaveFSWindow;
       await leaveFSWebview;
+      await leaveFSWindow;
     });
   });
 
