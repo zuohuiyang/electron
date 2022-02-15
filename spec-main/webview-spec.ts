@@ -436,7 +436,7 @@ describe('<webview> tag', function () {
 
     afterEach(closeAllWindows);
 
-    it('should make parent frame element fullscreen too', async () => {
+    xit('should make parent frame element fullscreen too', async () => {
       const [w, webview] = await loadWebViewWindow();
       expect(await w.webContents.executeJavaScript('isIframeFullscreen()')).to.be.false();
 
