@@ -1695,12 +1695,30 @@ describe('BrowserWindow module', () => {
     });
 
     it('Allows setting a transparent window via CSS', async () => {
-      const appPath = path.join(__dirname, 'fixtures', 'apps', 'background-color-transparent');
+      const display = screen.getPrimaryDisplay();
+      const TRANSPARENT_BG_COLOR = '#515152';
 
-      appProcess = childProcess.spawn(process.execPath, [appPath]);
+      const window = new BrowserWindow({
+        frame: false,
+        transparent: true,
+        vibrancy: 'under-window',
+        webPreferences: {
+          contextIsolation: false,
+          nodeIntegration: true
+        }
+      });
 
-      const [code] = await emittedOnce(appProcess, 'exit');
-      expect(code).to.equal(0);
+      const file = path.join(__dirname, 'fixtures', 'pages', 'css-transparent.html');
+      await window.loadFile(file);
+      await emittedOnce(ipcMain, 'set-transparent');
+
+      const screenCapture = await captureScreen();
+      const centerColor = getPixelColor(screenCapture, {
+        x: display.size.width / 2,
+        y: display.size.height / 2
+      });
+
+      expect(areColorsSimilar(centerColor, TRANSPARENT_BG_COLOR)).to.be.true();
     });
   });
 

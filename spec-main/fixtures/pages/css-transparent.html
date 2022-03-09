@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>test-color-window</title>
+    <style>
+      body {
+        background: green;
+      }
+      </style>
+  </head>
+  <body id="body">
+    <script>
+      const { ipcRenderer } = require('electron');
+
+      window.setTimeout(async (_) => {
+        document.body.style.background = 'transparent';
+
+        window.setTimeout(async (_) => {
+          ipcRenderer.send('set-transparent');
+        }, 2000);
+      }, 3000);
+    </script>
+  </body>
+</html>
