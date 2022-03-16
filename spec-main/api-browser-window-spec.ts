@@ -1696,12 +1696,23 @@ describe('BrowserWindow module', () => {
 
     it('Allows setting a transparent window via CSS', async () => {
       const display = screen.getPrimaryDisplay();
-      const TRANSPARENT_BG_COLOR = '#515152';
+      const TRANSPARENT_BG_COLOR = '#244a24';
 
-      const window = new BrowserWindow({
+      const backgroundWindow = new BrowserWindow({
+        ...display.bounds,
+        frame: false,
+        backgroundColor: CHROMA_COLOR_HEX,
+        hasShadow: false
+      });
+
+      await backgroundWindow.loadURL('about:blank');
+
+      const foregroundWindow = new BrowserWindow({
+        ...display.bounds,
         frame: false,
         transparent: true,
         vibrancy: 'under-window',
+        hasShadow: false,
         webPreferences: {
           contextIsolation: false,
           nodeIntegration: true
@@ -1709,7 +1720,7 @@ describe('BrowserWindow module', () => {
       });
 
       const file = path.join(__dirname, 'fixtures', 'pages', 'css-transparent.html');
-      await window.loadFile(file);
+      await foregroundWindow.loadFile(file);
       await emittedOnce(ipcMain, 'set-transparent');
 
       const screenCapture = await captureScreen();
