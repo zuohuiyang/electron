@@ -1729,6 +1729,7 @@ describe('BrowserWindow module', () => {
         y: display.size.height / 2
       });
 
+      console.log(`centerColor is ${centerColor} and TRANSPARENT_BG_COLOR is ${TRANSPARENT_BG_COLOR}`);
       expect(areColorsSimilar(centerColor, TRANSPARENT_BG_COLOR)).to.be.true();
     });
   });
