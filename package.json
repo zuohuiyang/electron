@@ -138,6 +138,7 @@
       "ts-node script/check-patch-diff.ts"
     ],
     "DEPS": [
+      "ts-node script/check-node-types-version.ts",
       "node script/gen-hunspell-filenames.js"
     ]
   }
