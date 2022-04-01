@@ -1,0 +1,98 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Keeley Hammond <khammond@slack-corp.com>
+Date: Fri, 1 Apr 2022 12:00:12 -0700
+Subject: Revert "Reland "mac: Make dump_syms (and symupload) buildable for
+ target""
+
+This reverts commit f63161904212bdc4f0ec274f06ffef9fb723d7e1. The original change breaks the win-ia32 job.
+
+diff --git a/build/redirect_stdout.py b/build/redirect_stdout.py
+index 364762dcbbcb23c859ff6c6909bb7bab8a150ba0..166293cb38aa6608dc0ebcf39ebbbad5f08dba7c 100644
+--- a/build/redirect_stdout.py
++++ b/build/redirect_stdout.py
+@@ -4,7 +4,6 @@
+ 
+ from __future__ import print_function
+ 
+-import os
+ import subprocess
+ import sys
+ 
+@@ -18,12 +17,5 @@ if __name__ == '__main__':
+     print("Usage: %s output_file command..." % sys.argv[0], file=sys.stderr)
+     sys.exit(1)
+ 
+-  # This script is designed to run binaries produced by the current build. We
+-  # may prefix it with "./" to avoid picking up system versions that might
+-  # also be on the path.
+-  path = sys.argv[2]
+-  if not os.path.isabs(path):
+-    path = './' + path
+-
+   with open(sys.argv[1], 'w') as fp:
+-    sys.exit(subprocess.check_call([path] + sys.argv[3:], stdout=fp))
++    sys.exit(subprocess.check_call(sys.argv[2:], stdout=fp))
+diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+index b8abc10e48bdff0f4e6c3f8e1c4927bc6e0c2f79..87dfcd3b5cf5bae5bae04e1296858067f0795e9e 100644
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -1296,11 +1296,9 @@ if (is_win) {
+       outputs =
+           [ "$root_out_dir/{{source_file_part}}-$chrome_version_full.breakpad" ]
+ 
+-      dump_syms = "//third_party/breakpad:dump_syms($host_toolchain)"
+-      args = rebase_path(outputs, root_build_dir) + [
+-               rebase_path(get_label_info(dump_syms, "root_out_dir") + "/" +
+-                               get_label_info(dump_syms, "name"),
+-                           root_build_dir),
++      # Use an absolute path to dump_syms in case a user has it in their path.
++      args = rebase_path(outputs, root_out_dir) + [
++               rebase_path("$root_out_dir/dump_syms"),
+                "-g",
+                rebase_path(
+                    "$root_out_dir/{{source_file_part}}.dSYM/Contents/Resources/DWARF/{{source_file_part}}",
+@@ -1314,6 +1312,7 @@ if (is_win) {
+         "//components/crash/core/app:chrome_crashpad_handler",
+         "//third_party/angle:libEGL",
+         "//third_party/angle:libGLESv2",
++        "//third_party/breakpad:dump_syms",
+         "//third_party/swiftshader/src/OpenGL/libEGL:swiftshader_libEGL",
+         "//third_party/swiftshader/src/OpenGL/libGLESv2:swiftshader_libGLESv2",
+         "//third_party/swiftshader/src/Vulkan:swiftshader_libvulkan",
+diff --git a/chrome/updater/mac/BUILD.gn b/chrome/updater/mac/BUILD.gn
+index 4ad1c9b95663b507dcc8be68403667eef31f57d0..6ed561be3f57e8c25c96c2e7b00cfd75959e9b83 100644
+--- a/chrome/updater/mac/BUILD.gn
++++ b/chrome/updater/mac/BUILD.gn
+@@ -352,15 +352,14 @@ if (!is_component_build && enable_dsyms) {
+     dump_syms = "//third_party/breakpad:dump_syms($host_toolchain)"
+     public_deps = [
+       ":updater_bundle",
+-      dump_syms,
++      "//third_party/breakpad:dump_syms",
+     ]
+     outputs =
+         [ "$root_out_dir/{{source_file_part}}-$chrome_version_full.breakpad" ]
+ 
+-    args = rebase_path(outputs, root_build_dir) + [
+-             rebase_path(get_label_info(dump_syms, "root_out_dir") + "/" +
+-                             get_label_info(dump_syms, "name"),
+-                         root_build_dir),
++    # Use an absolute path to dump_syms in case a user has it in their path.
++    args = rebase_path(outputs, root_out_dir) + [
++             rebase_path("$root_out_dir/dump_syms"),
+              "-g",
+              rebase_path(
+                  "$root_out_dir/{{source_file_part}}.dSYM/Contents/Resources/DWARF/{{source_file_part}}",
+diff --git a/third_party/breakpad/BUILD.gn b/third_party/breakpad/BUILD.gn
+index 48defa6ef092c6e15f4b2a024cb39a8de8309ea6..1ff49cf43dee28ec293e293d09845b24cae74a06 100644
+--- a/third_party/breakpad/BUILD.gn
++++ b/third_party/breakpad/BUILD.gn
+@@ -279,7 +279,7 @@ if (!is_win) {
+ # Mac --------------------------------------------------------------------------
+ 
+ if (is_mac) {
+-  if (current_toolchain == host_toolchain || target_os != "ios") {
++  if (current_toolchain == host_toolchain) {
+     source_set("common") {
+       sources = [
+         "breakpad/src/common/dwarf/bytereader.cc",
