@@ -134,7 +134,6 @@ function assetsForVersion (version, validatingRelease) {
     `electron-${version}-mas-arm64-symbols.zip`,
     `electron-${version}-mas-arm64.zip`,
     `electron-${version}-win32-ia32-pdb.zip`,
-    `electron-${version}-win32-ia32-symbols.zip`,
     `electron-${version}-win32-ia32.zip`,
     `electron-${version}-win32-x64-pdb.zip`,
     `electron-${version}-win32-x64-symbols.zip`,
