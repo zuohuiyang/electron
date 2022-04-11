@@ -334,6 +334,7 @@ source_set("plugins") {
     "//ppapi/buildflags",
     "//ppapi/proxy:ipc",
     "//services/device/public/mojom",
+    "//storage/browser",
   ]
   if (enable_pdf_viewer) {
     deps += [ "//components/pdf/browser" ]
