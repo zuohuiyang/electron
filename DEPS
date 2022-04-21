@@ -1,19 +1,19 @@
 gclient_gn_args_from = 'src'
 
 vars = {
-  'chromium_version':
-    '102.0.4989.0',
-  'node_version':
-    'v16.14.2',
-  'nan_version':
+  'chromium_revision':
+    '279c68f9934e8897cbc3a1f22fab1f185ba2cbd5', # 102.0.4989.0
+  'node_revision':
+    '442e84a358d75152556b5d087e4dd6a51615330d', # v16.14.2
+  'nan_revision':
     # The following commit hash of NAN is v2.14.2 with *only* changes to the
     # test suite. This should be updated to a specific tag when one becomes
     # available.
     '65b32af46e9d7fab2e4ff657751205b3865f4920',
-  'squirrel.mac_version':
+  'squirrel.mac_revision':
     '0e5d146ba13101a1302d59ea6e6e0b3cace4ae38',
 
-  'pyyaml_version': '3.12',
+  'pyyaml_revision': '7e026bfee9cc0bddeb1bbca0c4a0bcd826c2bfdf', # 3.12
 
   'chromium_git': 'https://chromium.googlesource.com',
   'electron_git': 'https://github.com/electron',
@@ -70,23 +70,23 @@ vars = {
 
 deps = {
   'src': {
-    'url': (Var("chromium_git")) + '/chromium/src.git@' + (Var("chromium_version")),
+    'url': (Var("chromium_git")) + '/chromium/src.git@' + (Var("chromium_revision")),
     'condition': 'checkout_chromium and process_deps',
   },
   'src/third_party/nan': {
-    'url': (Var("nodejs_git")) + '/nan.git@' + (Var("nan_version")),
+    'url': (Var("nodejs_git")) + '/nan.git@' + (Var("nan_revision")),
     'condition': 'checkout_nan and process_deps',
   },
   'src/third_party/electron_node': {
-    'url': (Var("nodejs_git")) + '/node.git@' + (Var("node_version")),
+    'url': (Var("nodejs_git")) + '/node.git@' + (Var("node_revision")),
     'condition': 'checkout_node and process_deps',
   },
   'src/third_party/pyyaml': {
-    'url': (Var("yaml_git")) + '/pyyaml.git@' + (Var("pyyaml_version")),
+    'url': (Var("yaml_git")) + '/pyyaml.git@' + (Var("pyyaml_revision")),
     'condition': 'checkout_pyyaml and process_deps',
   },
   'src/third_party/squirrel.mac': {
-    'url': Var("squirrel_git") + '/Squirrel.Mac.git@' + Var("squirrel.mac_version"),
+    'url': Var("squirrel_git") + '/Squirrel.Mac.git@' + Var("squirrel.mac_revision"),
     'condition': 'process_deps',
   },
   'src/third_party/squirrel.mac/vendor/ReactiveObjC': {

@@ -270,7 +270,9 @@ step-gclient-sync: &step-gclient-sync
           $GCLIENT_EXTRA_ARGS \
           "$CIRCLE_REPOSITORY_URL"
 
-        ELECTRON_USE_THREE_WAY_MERGE_FOR_PATCHES=1 gclient sync --with_branch_heads --with_tags
+        cd src
+        ELECTRON_USE_THREE_WAY_MERGE_FOR_PATCHES=1 gclient sync --no-history
+        cd ..
         if [ "$IS_RELEASE" != "true" ]; then
           # Re-export all the patches to check if there were changes.
           python src/electron/script/export_all_patches.py src/electron/patches/config.json
@@ -961,7 +963,7 @@ step-set-git-cache-path: &step-set-git-cache-path
     command: |
       # CircleCI does not support interpolation when setting environment variables.
       # https://circleci.com/docs/2.0/env-vars/#setting-an-environment-variable-in-a-shell-command
-      echo 'export GIT_CACHE_PATH="$PWD/gclient-cache"' >> $BASH_ENV
+      # echo 'export GIT_CACHE_PATH="$PWD/gclient-cache"' >> $BASH_ENV
 
 # Persist the git cache based on the hash of DEPS and .circle-sync-done
 # If the src cache was restored above then this will persist an empty cache
@@ -1252,14 +1254,14 @@ commands:
       - when:
           condition: << parameters.halt-if-successful >>
           steps:
-            - *step-maybe-restore-src-cache-marker
+            # - *step-maybe-restore-src-cache-marker
             - run:
                 name: Halt the job early if the src cache exists
                 command: |
                   if [ -f ".src-cache-marker" ]; then
                     circleci-agent step halt
                   fi
-      - *step-maybe-restore-src-cache
+      # - *step-maybe-restore-src-cache
       - run:
           name: Fix the src cache restore point on macOS
           command: |
@@ -1403,10 +1405,10 @@ commands:
             - *step-generate-deps-hash-cleanly
             - *step-mark-sync-done
             # Save git cache AFTER sync marked done because other jobs expect that to be the case
-            - when:
-                condition: << parameters.save-git-cache >>
-                steps:
-                  - *step-save-git-cache            
+            # - when:
+            #     condition: << parameters.save-git-cache >>
+            #     steps:
+            #       - *step-save-git-cache            
             - *step-minimize-workspace-size-from-checkout
             - *step-delete-git-directories
             - when:
@@ -1426,9 +1428,9 @@ commands:
                         sudo mkdir -p /var/portal
                         sudo chown -R $(id -u):$(id -g) /var/portal
                         mv ./src /var/portal
-                  - *step-save-src-cache
-                  - *step-make-src-cache-marker
-                  - *step-save-src-cache-marker
+                  # - *step-save-src-cache
+                  # - *step-make-src-cache-marker
+                  # - *step-save-src-cache-marker
 
       - when:
           condition: << parameters.build >>
