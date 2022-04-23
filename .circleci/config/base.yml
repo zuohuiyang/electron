@@ -1704,7 +1704,9 @@ jobs:
 
   # Layer 2: Builds.
   linux-x64-testing:
-    executor: linux-docker
+    executor:
+      name: linux-docker
+      size: xlarge
     environment:
       <<: *env-global
       <<: *env-testing-build
