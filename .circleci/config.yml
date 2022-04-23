@@ -50,6 +50,14 @@ jobs:
       - image: cimg/node:16.14
     steps:
       - checkout
+      - run:
+          name: Generate DEPS Hash
+          command: node script/generate-deps-hash.js && cat .depshash-target
+      - restore_cache:
+          keys:
+            # If you change this key, please ensure you change the key in base.yml too
+            - v14-src-cache-marker-{{ checksum ".depshash" }}
+          name: Restoring src cache marker
       - path-filtering/set-parameters:
           base-revision: main
           mapping: |
@@ -63,6 +71,12 @@ jobs:
             yarn
             export CIRCLECI_BINARY="$HOME/circleci"
             curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | DESTDIR=$CIRCLECI_BINARY bash
+
+            # Configuration for EJS
+            if [ -f ".src-cache-marker" ]; then
+              export ELECTRON_SRC_CACHE_ALREADY_BUILT=1
+            fi
+
             node build.js
           name: Pack config.yml
       - continuation/continue:
