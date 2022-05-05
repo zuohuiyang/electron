@@ -468,7 +468,7 @@ describe('<webview> tag', function () {
       await Promise.all([enterHTMLFS, leaveHTMLFS, parentFullscreen]);
     });
 
-    // FIXME(zcbenz): Fullscreen events do not work on Linux.
+    // FIXME: Fullscreen events do not work on Linux.
     // This test is flaky on arm64 macOS.
     ifit(process.platform !== 'linux' && process.arch !== 'arm64')('exiting fullscreen should unfullscreen window', async () => {
       const [w, webview] = await loadWebViewWindow();
@@ -483,8 +483,9 @@ describe('<webview> tag', function () {
       expect(w.isFullScreen()).to.be.false();
     });
 
-    // Sending ESC via sendInputEvent only works on Windows.
-    ifit(process.platform === 'win32')('pressing ESC should unfullscreen window', async () => {
+    // FIXME: Fullscreen events do not work on Linux.
+    // This test is flaky on arm64 macOS.
+    ifit(process.platform !== 'linux' && process.arch !== 'arm64')('pressing ESC should unfullscreen window', async () => {
       const [w, webview] = await loadWebViewWindow();
       const enterFullScreen = emittedOnce(w, 'enter-full-screen');
       await webview.executeJavaScript('document.getElementById("div").requestFullscreen()', true);
@@ -497,7 +498,8 @@ describe('<webview> tag', function () {
       expect(w.isFullScreen()).to.be.false();
     });
 
-    it('pressing ESC should emit the leave-html-full-screen event', async () => {
+    // This test is flaky on arm64 macOS.
+    ifit(process.platform !== 'darwin' || process.arch !== 'arm64')('pressing ESC should emit the leave-html-full-screen event', async () => {
       const w = new BrowserWindow({
         show: false,
         webPreferences: {
