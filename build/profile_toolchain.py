@@ -59,12 +59,21 @@ def windows_installed_software():
 
     proc = subprocess.Popen(
         ["powershell.exe", "-Command", "-"],
+        shell=True,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-
-    stdout, _ = proc.communicate(" ".join(powershell_command).encode("utf-8"))
-    print(stdout)
+    
+    # try:
+    #     out, err = proc.communicate(" ".join(powershell_command).encode("utf-8"), timeout=500)
+    # except subprocess.TimeoutExpired:
+    #     print('Hit TimeoutException')
+    #     proc.kill()
+    #     out, err = proc.communicate()
+    out, err = proc.communicate(" ".join(powershell_command).encode("utf-8"), timeout=500)
+    print('out: ' + out)
+    print('err: ' + err)
     print(proc.returncode)
 
     if proc.returncode != 0:
@@ -73,7 +82,7 @@ def windows_installed_software():
     # On AppVeyor there's other output related to PSReadline,
     # so grab only the JSON output and ignore everything else
     json_match = re.match(
-        r".*(\[.*{.*}.*\]).*", stdout.decode("utf-8"), re.DOTALL
+        r".*(\[.*{.*}.*\]).*", out.decode("utf-8"), re.DOTALL
     )
 
     if not json_match:
