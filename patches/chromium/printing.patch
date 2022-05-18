@@ -374,8 +374,8 @@ index 3701853ada7f0ffe3cc8a798496f9f48541b4f47..973666a1315c8cbba0a2cefbe9195fdc
    if (!weak_this)
      return false;
  
-@@ -987,6 +1027,13 @@ void PrintViewManagerBase::ReleasePrintJob() {
-   UnregisterSystemPrintClient();
+@@ -993,6 +993,13 @@ void PrintViewManagerBase::ReleasePrintJob() {
+   }
  #endif
  
 +  if (!callback_.is_null()) {
