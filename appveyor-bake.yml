@@ -32,6 +32,7 @@ build_script:
   - mkdir src
   - ps: git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git  
   - ps: $env:PATH="$pwd\depot_tools;$env:PATH"  
+  - ps: Get-ChildItem src\electron
   - ps: Move-Item $env:APPVEYOR_BUILD_FOLDER -Destination src\electron
   - src\electron\script\setup-win-for-dev.bat
   - ps: $env:CHROMIUM_BUILDTOOLS_PATH="$pwd\src\buildtools"
@@ -48,6 +49,7 @@ build_script:
   - gclient sync --with_branch_heads --with_tags
   - ps: >-
       echo "Finishing sync for image: $env:APPVEYOR_BAKE_IMAGE at dir $PWD"
+  - ps: Get-ChildItem src\electron
 on_image_bake:
 - ps: >-
     echo "Baking image: $env:APPVEYOR_BAKE_IMAGE at dir $PWD"
