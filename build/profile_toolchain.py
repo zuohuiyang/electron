@@ -5,8 +5,6 @@ import sys
 import os
 import optparse
 import json
-import re
-import subprocess
 
 sys.path.append("%s/../../build" % os.path.dirname(os.path.realpath(__file__)))
 
@@ -36,65 +34,14 @@ def calculate_hash(root):
         return CalculateHash('.', None)
 
 def windows_installed_software():
-    powershell_command = [
-        "Get-CimInstance",
-        "-Namespace",
-        "root\cimv2",
-        "-Class",
-        "Win32_product",
-        "|",
-        "Select",
-        "vendor,",
-        "description,",
-        "@{l='install_location';e='InstallLocation'},",
-        "@{l='install_date';e='InstallDate'},",
-        "@{l='install_date_2';e='InstallDate2'},",
-        "caption,",
-        "version,",
-        "name,",
-        "@{l='sku_number';e='SKUNumber'}",
-        "|",
-        "ConvertTo-Json",
-    ]
-
-    proc = subprocess.Popen(
-        ["powershell.exe", "-Command", "-"],
-        shell=True,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    
-    # try:
-    #     out, err = proc.communicate(" ".join(powershell_command).encode("utf-8"), timeout=500)
-    # except subprocess.TimeoutExpired:
-    #     print('Hit TimeoutException')
-    #     proc.kill()
-    #     out, err = proc.communicate()
-    out, err = proc.communicate(" ".join(powershell_command).encode("utf-8"), timeout=500)
-    print('out: ' + out)
-    print('err: ' + err)
-    print(proc.returncode)
-
-    if proc.returncode != 0:
-        raise RuntimeError("Failed to get list of installed software")
-
-    # On AppVeyor there's other output related to PSReadline,
-    # so grab only the JSON output and ignore everything else
-    json_match = re.match(
-        r".*(\[.*{.*}.*\]).*", out.decode("utf-8"), re.DOTALL
-    )
-
-    if not json_match:
-        raise RuntimeError(
-            "Couldn't find JSON output for list of installed software"
-        )
+    f = open('installed_software.json', 'r')
+    json_data = json.loads(f.read())
 
     # Filter out missing keys
     return list(
         map(
             lambda info: {k: info[k] for k in info if info[k]},
-            json.loads(json_match.group(1)),
+            json.loads(json_data.group(1)),
         )
     )
 

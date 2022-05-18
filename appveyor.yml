@@ -122,7 +122,9 @@ build_script:
   - ninja -C out/Default electron:electron_chromedriver_zip
   - ninja -C out/Default third_party/electron_node:headers
   - python %LOCAL_GOMA_DIR%\goma_ctl.py stat
-  - set DEPOT_TOOLS_WIN_TOOLCHAIN=0
+  # Setup for grabbing the toolchain profile
+  - ps: >-
+      Get-CimInstance -Namespace root\cimv2 -Class Win32_product | Select vendor, description, @{l='install_location';e='InstallLocation'}, @{l='install_date';e='InstallDate'}, @{l='install_date_2';e='InstallDate2'}, caption, version, name, @{l='sku_number';e='SKUNumber'} | ConvertTo-Json > .\electron\build\installed_software.json 2> .\electron\build\installed_software.err
   - python electron/build/profile_toolchain.py --output-json=out/Default/windows_toolchain_profile.json
   - 7z a node_headers.zip out\Default\gen\node_headers
   - ps: >-
