@@ -263,10 +263,10 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
    // Send the message
    if (!WriteToSocket(socket.fd(), to_send.data(), to_send.length())) {
      // Try to kill the other process, because it might have been dead.
-@@ -957,6 +1016,17 @@ ProcessSingleton::NotifyResult ProcessSingleton::NotifyOtherProcessWithTimeout(
-       linux_ui->NotifyWindowManagerStartupComplete();
- #endif
- 
+@@ -944,6 +944,17 @@ ProcessSingleton::NotifyResult ProcessSingleton::NotifyOtherProcessWithTimeout(
+         REMOTE_PROCESS_SHUTTING_DOWN);
+     return PROCESS_NONE;
+   } else if (strncmp(buf, kACKToken, std::size(kACKToken) - 1) == 0) {
 +    size_t ack_data_len = len - (std::size(kACKToken) - 1);
 +    if (ack_data_len) {
 +      const uint8_t* raw_ack_data =
