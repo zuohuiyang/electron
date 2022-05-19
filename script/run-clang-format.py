@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """A wrapper script around clang-format, suitable for linting multiple files
 and to use for continuous integration.
+
 This is an alternative API for the clang-format command line.
 It runs over multiple files and directories in parallel.
 A diff output is produced and a sensible exit code is returned.
+
 """
 
 from __future__ import print_function, unicode_literals
@@ -13,19 +15,24 @@ import codecs
 import difflib
 import fnmatch
 import io
+import errno
 import multiprocessing
 import os
-import posixpath
 import signal
 import subprocess
 import sys
 import traceback
-import tempfile
 
 from functools import partial
-from lib.util import get_buildtools_executable
 
-DEFAULT_EXTENSIONS = 'c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx,mm'
+try:
+    from subprocess import DEVNULL  # py3k
+except ImportError:
+    DEVNULL = open(os.devnull, "wb")
+
+
+DEFAULT_EXTENSIONS = 'c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx'
+DEFAULT_CLANG_FORMAT_IGNORE = '.clang-format-ignore'
 
 
 class ExitStatus:
@@ -33,6 +40,23 @@ class ExitStatus:
     DIFF = 1
     TROUBLE = 2
 
+def excludes_from_file(ignore_file):
+    excludes = []
+    try:
+        with io.open(ignore_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('#'):
+                    # ignore comments
+                    continue
+                pattern = line.rstrip()
+                if not pattern:
+                    # allow empty lines
+                    continue
+                excludes.append(pattern)
+    except EnvironmentError as e:
+        if e.errno != errno.ENOENT:
+            raise
+    return excludes;
 
 def list_files(files, recursive=False, extensions=None, exclude=None):
     if extensions is None:
@@ -41,11 +65,14 @@ def list_files(files, recursive=False, extensions=None, exclude=None):
         exclude = []
 
     out = []
-    for f in files:
-        if recursive and os.path.isdir(f):
-            for dirpath, dnames, fnames in os.walk(f):
+    for file in files:
+        if recursive and os.path.isdir(file):
+            for dirpath, dnames, fnames in os.walk(file):
                 fpaths = [os.path.join(dirpath, fname) for fname in fnames]
                 for pattern in exclude:
+                    # os.walk() supports trimming down the dnames list
+                    # by modifying it in-place,
+                    # to avoid unnecessary directory listings.
                     dnames[:] = [
                         x for x in dnames
                         if
@@ -54,95 +81,111 @@ def list_files(files, recursive=False, extensions=None, exclude=None):
                     fpaths = [
                         x for x in fpaths if not fnmatch.fnmatch(x, pattern)
                     ]
-                for fp in fpaths:
-                    ext = os.path.splitext(fp)[1][1:]
+                for f in fpaths:
+                    ext = os.path.splitext(f)[1][1:]
                     if ext in extensions:
-                        out.append(fp)
+                        out.append(f)
         else:
-            ext = os.path.splitext(f)[1][1:]
-            if ext in extensions:
-                out.append(f)
+            out.append(file)
     return out
 
 
-def make_diff(diff_file, original, reformatted):
+def make_diff(file, original, reformatted):
     return list(
         difflib.unified_diff(
             original,
             reformatted,
-            fromfile='a/{}'.format(diff_file),
-            tofile='b/{}'.format(diff_file),
+            fromfile='{}\t(original)'.format(file),
+            tofile='{}\t(reformatted)'.format(file),
             n=3))
 
 
 class DiffError(Exception):
     def __init__(self, message, errs=None):
-        # pylint: disable=R1725
-        super(DiffError, self).__init__(message)
+        super().__init__(message)
         self.errs = errs or []
 
 
 class UnexpectedError(Exception):
     def __init__(self, message, exc=None):
-        # pylint: disable=R1725
-        super(UnexpectedError, self).__init__(message)
+        super().__init__(message)
         self.formatted_traceback = traceback.format_exc()
         self.exc = exc
 
 
-def run_clang_format_diff_wrapper(args, file_name):
+def run_clang_format_diff_wrapper(args, file):
     try:
-        ret = run_clang_format_diff(args, file_name)
+        ret = run_clang_format_diff(args, file)
         return ret
     except DiffError:
         raise
     except Exception as e:
         # pylint: disable=W0707
-        raise UnexpectedError('{}: {}: {}'.format(
-            file_name, e.__class__.__name__, e), e)
+        raise UnexpectedError('{}: {}: {}'.format(file, e.__class__.__name__,
+                                                  e), e)
 
 
-def run_clang_format_diff(args, file_name):
+def run_clang_format_diff(args, file):
     try:
-        with io.open(file_name, 'r', encoding='utf-8') as f:
+        with io.open(file, 'r', encoding='utf-8') as f:
             original = f.readlines()
     except IOError as exc:
         # pylint: disable=W0707
         raise DiffError(str(exc))
-    invocation = [args.clang_format_executable, file_name]
-    if args.fix:
-        invocation.append('-i')
+    
+    if args.in_place:
+        invocation = [args.clang_format_executable, '-i', file]
+    else:
+        invocation = [args.clang_format_executable, file]
+
+    if args.style:
+        invocation.extend(['--style', args.style])
+
+    if args.dry_run:
+        print(" ".join(invocation))
+        return [], []
+
+    # Use of utf-8 to decode the process output.
+    encoding_py3 = {}
+    if sys.version_info[0] >= 3:
+        encoding_py3['encoding'] = 'utf-8'
+
     try:
         proc = subprocess.Popen(
-            ' '.join(invocation),
+            invocation,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
-            shell=True)
+            **encoding_py3)
     except OSError as exc:
         # pylint: disable=W0707
-        raise DiffError(str(exc))
+        raise DiffError(
+            "Command '{}' failed to start: {}".format(
+                subprocess.list2cmdline(invocation), exc
+            )
+        )
     proc_stdout = proc.stdout
     proc_stderr = proc.stderr
-    if sys.version_info[0] == 3:
-        proc_stdout = proc_stdout.detach()
-        proc_stderr = proc_stderr.detach()
-    # make the pipes compatible with Python 3,
-    # reading lines should output unicode
-    encoding = 'utf-8'
-    proc_stdout = codecs.getreader(encoding)(proc_stdout)
-    proc_stderr = codecs.getreader(encoding)(proc_stderr)
+    if sys.version_info[0] < 3:
+        # make the pipes compatible with Python 3,
+        # reading lines should output unicode
+        encoding = 'utf-8'
+        proc_stdout = codecs.getreader(encoding)(proc_stdout)
+        proc_stderr = codecs.getreader(encoding)(proc_stderr)
+    # hopefully the stderr pipe won't get full and block the process
     outs = list(proc_stdout.readlines())
     errs = list(proc_stderr.readlines())
     proc.wait()
     if proc.returncode:
-        raise DiffError("clang-format exited with status {}: '{}'".format(
-            proc.returncode, file_name), errs)
-    if args.fix:
-        return None, errs
-    if sys.platform == 'win32':
-        file_name = file_name.replace(os.sep, posixpath.sep)
-    return make_diff(file_name, original, outs), errs
+        raise DiffError(
+            "Command '{}' returned non-zero exit status {}".format(
+                subprocess.list2cmdline(invocation), proc.returncode
+            ),
+            errs,
+        )
+    if args.in_place:
+        return [], errs
+    return make_diff(file, original, outs), errs
 
 
 def bold_red(s):
@@ -197,31 +240,33 @@ def main():
         '--clang-format-executable',
         metavar='EXECUTABLE',
         help='path to the clang-format executable',
-        default=get_buildtools_executable('clang-format'))
+        default='clang-format')
     parser.add_argument(
         '--extensions',
         help='comma separated list of file extensions (default: {})'.format(
             DEFAULT_EXTENSIONS),
         default=DEFAULT_EXTENSIONS)
     parser.add_argument(
-        '--fix',
-        help='if specified, reformat files in-place',
-        action='store_true')
-    parser.add_argument(
         '-r',
         '--recursive',
         action='store_true',
         help='run recursively over directories')
+    parser.add_argument(
+        '-d',
+        '--dry-run',
+        action='store_true',
+        help='just print the list of files')
+    parser.add_argument(
+        '-i',
+        '--in-place',
+        action='store_true',
+        help='format file instead of printing differences')
     parser.add_argument('files', metavar='file', nargs='+')
     parser.add_argument(
         '-q',
         '--quiet',
-        action='store_true')
-    parser.add_argument(
-        '-c',
-        '--changed',
         action='store_true',
-        help='only run on changed files')
+        help="disable output, useful for the exit code")
     parser.add_argument(
         '-j',
         metavar='N',
@@ -242,6 +287,9 @@ def main():
         default=[],
         help='exclude paths matching the given glob-like pattern(s)'
         ' from recursive search')
+    parser.add_argument(
+        '--style',
+        help='formatting style to apply (LLVM/Google/Chromium/Mozilla/WebKit)')
 
     args = parser.parse_args()
 
@@ -265,42 +313,40 @@ def main():
         colored_stdout = sys.stdout.isatty()
         colored_stderr = sys.stderr.isatty()
 
+    version_invocation = [args.clang_format_executable, str("--version")]
+    try:
+        subprocess.check_call(version_invocation, stdout=DEVNULL)
+    except subprocess.CalledProcessError as e:
+        print_trouble(parser.prog, str(e), use_colors=colored_stderr)
+        return ExitStatus.TROUBLE
+    except OSError as e:
+        print_trouble(
+            parser.prog,
+            "Command '{}' failed to start: {}".format(
+                subprocess.list2cmdline(version_invocation), e
+            ),
+            use_colors=colored_stderr,
+        )
+        return ExitStatus.TROUBLE
+
     retcode = ExitStatus.SUCCESS
 
-    parse_files = []
-    if args.changed:
-        popen = subprocess.Popen(
-            'git diff --name-only --cached',
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            shell=True
-        )
-        for line in popen.stdout:
-            file_name = line.rstrip()
-            # don't check deleted files
-            if os.path.isfile(file_name):
-                parse_files.append(file_name)
-
-    else:
-        parse_files = args.files
+    excludes = excludes_from_file(DEFAULT_CLANG_FORMAT_IGNORE)
+    excludes.extend(args.exclude)
 
     files = list_files(
-        parse_files,
+        args.files,
         recursive=args.recursive,
-        exclude=args.exclude,
+        exclude=excludes,
         extensions=args.extensions.split(','))
 
     if not files:
-        return 0
+        return ExitStatus.SUCCESS
 
     njobs = args.j
     if njobs == 0:
         njobs = multiprocessing.cpu_count() + 1
     njobs = min(len(files), njobs)
-
-    if not args.fix:
-        patch_file = tempfile.NamedTemporaryFile(delete=False,
-                                                 prefix='electron-format-')
 
     if njobs == 1:
         # execute directly instead of in a pool,
@@ -311,6 +357,7 @@ def main():
         pool = multiprocessing.Pool(njobs)
         it = pool.imap_unordered(
             partial(run_clang_format_diff_wrapper, args), files)
+        pool.close()
     while True:
         try:
             outs, errs = next(it)
@@ -334,23 +381,12 @@ def main():
             sys.stderr.writelines(errs)
             if outs == []:
                 continue
-            if not args.fix:
-                if not args.quiet:
-                    print_diff(outs, use_color=colored_stdout)
-                    for line in outs:
-                        patch_file.write(line.encode('utf-8'))
-                    patch_file.write('\n'.encode('utf-8'))
-                if retcode == ExitStatus.SUCCESS:
-                    retcode = ExitStatus.DIFF
-
-    if not args.fix:
-        if patch_file.tell() == 0:
-          patch_file.close()
-          os.unlink(patch_file.name)
-        else:
-          print("\nTo patch these files, run:\n$ git apply {}\n"
-                .format(patch_file.name))
-
+            if not args.quiet:
+                print_diff(outs, use_color=colored_stdout)
+            if retcode == ExitStatus.SUCCESS:
+                retcode = ExitStatus.DIFF
+    if pool:
+        pool.join()
     return retcode
 
 
