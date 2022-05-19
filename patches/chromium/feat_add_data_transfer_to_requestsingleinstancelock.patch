@@ -96,10 +96,10 @@ index 5a64220aaf1309832dc0ad543e353de67fe0a779..5b701b1361707b610ed60c344e441e67
    // Return true if the given pid is one of our child processes.
    // Assumes that the current pid is the root of all pids of the current
 diff --git a/chrome/browser/process_singleton_posix.cc b/chrome/browser/process_singleton_posix.cc
-index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718da53500a 100644
+index 9d6ef0e143bdaf4a5043ebbb57d282d72d847433..8752fec16bb0a196e065a511ad248033ac610760 100644
 --- a/chrome/browser/process_singleton_posix.cc
 +++ b/chrome/browser/process_singleton_posix.cc
-@@ -145,7 +145,7 @@ const char kACKToken[] = "ACK";
+@@ -140,7 +140,7 @@ const char kACKToken[] = "ACK";
  const char kShutdownToken[] = "SHUTDOWN";
  const char kTokenDelimiter = '\0';
  const int kMaxMessageLength = 32 * 1024;
@@ -108,7 +108,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
  
  bool g_disable_prompt = false;
  bool g_skip_is_chrome_process_check = false;
-@@ -611,6 +611,7 @@ class ProcessSingleton::LinuxWatcher
+@@ -606,6 +606,7 @@ class ProcessSingleton::LinuxWatcher
    // |reader| is for sending back ACK message.
    void HandleMessage(const std::string& current_dir,
                       const std::vector<std::string>& argv,
@@ -116,7 +116,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
                       SocketReader* reader);
  
   private:
-@@ -635,6 +636,9 @@ class ProcessSingleton::LinuxWatcher
+@@ -630,6 +631,9 @@ class ProcessSingleton::LinuxWatcher
    // The ProcessSingleton that owns us.
    ProcessSingleton* const parent_;
  
@@ -126,7 +126,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
    std::set<std::unique_ptr<SocketReader>, base::UniquePtrComparator> readers_;
  };
  
-@@ -665,16 +669,21 @@ void ProcessSingleton::LinuxWatcher::StartListening(int socket) {
+@@ -660,16 +664,21 @@ void ProcessSingleton::LinuxWatcher::StartListening(int socket) {
  }
  
  void ProcessSingleton::LinuxWatcher::HandleMessage(
@@ -154,7 +154,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
      LOG(WARNING) << "Not handling interprocess notification as browser"
                      " is shutting down";
      // Send back "SHUTDOWN" message, so that the client process can start up
-@@ -684,6 +693,22 @@ void ProcessSingleton::LinuxWatcher::HandleMessage(
+@@ -679,6 +688,22 @@ void ProcessSingleton::LinuxWatcher::HandleMessage(
    }
  }
  
@@ -177,7 +177,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
  void ProcessSingleton::LinuxWatcher::RemoveSocketReader(SocketReader* reader) {
    DCHECK_CURRENTLY_ON(BrowserThread::IO);
    DCHECK(reader);
-@@ -719,7 +744,8 @@ void ProcessSingleton::LinuxWatcher::SocketReader::
+@@ -714,7 +739,8 @@ void ProcessSingleton::LinuxWatcher::SocketReader::
      }
    }
  
@@ -187,7 +187,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
    const size_t kMinMessageLength = std::size(kStartToken) + 4;
    if (bytes_read_ < kMinMessageLength) {
      buf_[bytes_read_] = 0;
-@@ -749,10 +775,28 @@ void ProcessSingleton::LinuxWatcher::SocketReader::
+@@ -744,10 +770,28 @@ void ProcessSingleton::LinuxWatcher::SocketReader::
    tokens.erase(tokens.begin());
    tokens.erase(tokens.begin());
  
@@ -217,7 +217,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
    fd_watch_controller_.reset();
  
    // LinuxWatcher::HandleMessage() is in charge of destroying this SocketReader
-@@ -781,8 +825,12 @@ void ProcessSingleton::LinuxWatcher::SocketReader::FinishWithACK(
+@@ -776,8 +820,12 @@ void ProcessSingleton::LinuxWatcher::SocketReader::FinishWithACK(
  //
  ProcessSingleton::ProcessSingleton(
      const base::FilePath& user_data_dir,
@@ -231,7 +231,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
        current_pid_(base::GetCurrentProcId()),
        watcher_(new LinuxWatcher(this)) {
    socket_path_ = user_data_dir.Append(chrome::kSingletonSocketFilename);
-@@ -901,7 +949,8 @@ ProcessSingleton::NotifyResult ProcessSingleton::NotifyOtherProcessWithTimeout(
+@@ -896,7 +944,8 @@ ProcessSingleton::NotifyResult ProcessSingleton::NotifyOtherProcessWithTimeout(
               sizeof(socket_timeout));
  
    // Found another process, prepare our command line
@@ -241,7 +241,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
    std::string to_send(kStartToken);
    to_send.push_back(kTokenDelimiter);
  
-@@ -911,11 +960,21 @@ ProcessSingleton::NotifyResult ProcessSingleton::NotifyOtherProcessWithTimeout(
+@@ -906,11 +955,21 @@ ProcessSingleton::NotifyResult ProcessSingleton::NotifyOtherProcessWithTimeout(
    to_send.append(current_dir.value());
  
    const std::vector<std::string>& argv = cmd_line.argv();
@@ -263,7 +263,7 @@ index 9bb12894da06fc7d281daced754b240afa9bedeb..52717600e7346daeb0726c177162c718
    // Send the message
    if (!WriteToSocket(socket.fd(), to_send.data(), to_send.length())) {
      // Try to kill the other process, because it might have been dead.
-@@ -944,6 +944,17 @@ ProcessSingleton::NotifyResult ProcessSingleton::NotifyOtherProcessWithTimeout(
+@@ -944,6 +1003,17 @@ ProcessSingleton::NotifyResult ProcessSingleton::NotifyOtherProcessWithTimeout(
          REMOTE_PROCESS_SHUTTING_DOWN);
      return PROCESS_NONE;
    } else if (strncmp(buf, kACKToken, std::size(kACKToken) - 1) == 0) {
