@@ -2,11 +2,10 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/browser/api/electron_api_web_contents.h"
-
 #include "content/browser/renderer_host/frame_tree.h"        // nogncheck
 #include "content/browser/renderer_host/frame_tree_node.h"   // nogncheck
 #include "content/browser/web_contents/web_contents_impl.h"  // nogncheck
+#include "shell/browser/api/electron_api_web_contents.h"
 
 #if BUILDFLAG(ENABLE_OSR)
 #include "shell/browser/osr/osr_render_widget_host_view.h"

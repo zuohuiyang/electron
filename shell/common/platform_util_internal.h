@@ -5,9 +5,9 @@
 #ifndef ELECTRON_SHELL_COMMON_PLATFORM_UTIL_INTERNAL_H_
 #define ELECTRON_SHELL_COMMON_PLATFORM_UTIL_INTERNAL_H_
 
-#include "shell/common/platform_util.h"
-
 #include <string>
+
+#include "shell/common/platform_util.h"
 
 namespace base {
 class FilePath;

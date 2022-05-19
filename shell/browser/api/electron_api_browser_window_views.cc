@@ -2,9 +2,8 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/browser/api/electron_api_browser_window.h"
-
 #include "content/browser/web_contents/web_contents_impl.h"  // nogncheck
+#include "shell/browser/api/electron_api_browser_window.h"
 #include "shell/browser/native_window_views.h"
 #include "ui/aura/window.h"
 

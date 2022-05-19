@@ -5,13 +5,13 @@
 #include <dwmapi.h>
 #include <windows.devices.enumeration.h>
 #include <wrl/client.h>
-#include <iomanip>
 
-#include "shell/browser/api/electron_api_system_preferences.h"
+#include <iomanip>
 
 #include "base/win/core_winrt_util.h"
 #include "base/win/windows_types.h"
 #include "base/win/wrapped_window_proc.h"
+#include "shell/browser/api/electron_api_system_preferences.h"
 #include "shell/common/color_util.h"
 #include "ui/base/win/shell.h"
 #include "ui/gfx/color_utils.h"

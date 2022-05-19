@@ -7,11 +7,10 @@
 
 #include <memory>
 
-#include "shell/browser/ui/autofill_popup.h"
-
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/render_widget_host.h"
 #include "electron/buildflags/buildflags.h"
+#include "shell/browser/ui/autofill_popup.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/views/drag_controller.h"

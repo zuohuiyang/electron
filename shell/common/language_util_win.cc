@@ -2,8 +2,6 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/common/language_util.h"
-
 #include <roapi.h>
 #include <windows.system.userprofile.h>
 #include <wrl.h>
@@ -13,6 +11,7 @@
 #include "base/win/i18n.h"
 #include "base/win/win_util.h"
 #include "base/win/windows_version.h"
+#include "shell/common/language_util.h"
 
 namespace electron {
 

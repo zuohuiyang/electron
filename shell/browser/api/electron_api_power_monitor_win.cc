@@ -2,14 +2,13 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/browser/api/electron_api_power_monitor.h"
-
 #include <windows.h>
 #include <wtsapi32.h>
 
 #include "base/win/windows_types.h"
 #include "base/win/wrapped_window_proc.h"
 #include "content/public/browser/browser_task_traits.h"
+#include "shell/browser/api/electron_api_power_monitor.h"
 #include "ui/base/win/shell.h"
 #include "ui/gfx/win/hwnd_util.h"
 

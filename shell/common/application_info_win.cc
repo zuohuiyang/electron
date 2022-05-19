@@ -2,13 +2,10 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/common/application_info.h"
-
-#include <windows.h>  // windows.h must be included first
-
 #include <VersionHelpers.h>
 #include <appmodel.h>
 #include <shlobj.h>
+#include <windows.h>  // windows.h must be included first
 
 #include <memory>
 
@@ -19,6 +16,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "shell/browser/win/scoped_hstring.h"
+#include "shell/common/application_info.h"
 
 namespace electron {
 

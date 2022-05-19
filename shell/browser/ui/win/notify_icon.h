@@ -5,9 +5,8 @@
 #ifndef ELECTRON_SHELL_BROWSER_UI_WIN_NOTIFY_ICON_H_
 #define ELECTRON_SHELL_BROWSER_UI_WIN_NOTIFY_ICON_H_
 
-#include <windows.h>  // windows.h must be included first
-
 #include <shellapi.h>
+#include <windows.h>  // windows.h must be included first
 
 #include <memory>
 #include <string>

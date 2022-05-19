@@ -2,10 +2,6 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/common/platform_util.h"
-
-#include <windows.h>  // windows.h must be included first
-
 #include <atlbase.h>
 #include <comdef.h>
 #include <commdlg.h>
@@ -13,6 +9,7 @@
 #include <objbase.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <windows.h>  // windows.h must be included first
 #include <wrl/client.h>
 
 #include "base/bind.h"
@@ -33,6 +30,7 @@
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "shell/common/electron_paths.h"
+#include "shell/common/platform_util.h"
 #include "ui/base/win/shell.h"
 #include "url/gurl.h"
 

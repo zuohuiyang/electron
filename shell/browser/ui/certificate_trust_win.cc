@@ -2,15 +2,13 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/browser/ui/certificate_trust.h"
-
-#include <windows.h>  // windows.h must be included first
-
 #include <wincrypt.h>
+#include <windows.h>  // windows.h must be included first
 
 #include "net/cert/cert_database.h"
 #include "net/cert/x509_util_win.h"
 #include "shell/browser/javascript_environment.h"
+#include "shell/browser/ui/certificate_trust.h"
 
 namespace certificate_trust {
 

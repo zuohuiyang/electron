@@ -2,8 +2,6 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/browser/ui/message_box.h"
-
 #include <map>
 
 #include "base/callback.h"
@@ -15,6 +13,7 @@
 #include "shell/browser/native_window_observer.h"
 #include "shell/browser/native_window_views.h"
 #include "shell/browser/ui/gtk_util.h"
+#include "shell/browser/ui/message_box.h"
 #include "shell/browser/unresponsive_suppressor.h"
 #include "ui/base/glib/glib_signal.h"
 #include "ui/gfx/image/image_skia.h"

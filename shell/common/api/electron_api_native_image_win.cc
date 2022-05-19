@@ -2,14 +2,12 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/common/api/electron_api_native_image.h"
-
-#include <windows.h>
-
 #include <thumbcache.h>
+#include <windows.h>
 #include <wrl/client.h>
 
 #include "base/win/scoped_com_initializer.h"
+#include "shell/common/api/electron_api_native_image.h"
 #include "shell/common/gin_converters/image_converter.h"
 #include "shell/common/gin_helper/promise.h"
 #include "shell/common/skia_util.h"
