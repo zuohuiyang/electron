@@ -2,8 +2,11 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include <commctrl.h>
+// clang-format off
 #include <windows.h>  // windows.h must be included first
+// clang-format on
+
+#include <commctrl.h>
 
 #include <map>
 #include <vector>

@@ -2,6 +2,12 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
+// clang-format off
+#include "shell/common/platform_util.h"
+
+#include <windows.h>  // windows.h must be included first
+// clang-format on
+
 #include <atlbase.h>
 #include <comdef.h>
 #include <commdlg.h>
@@ -9,9 +15,7 @@
 #include <objbase.h>
 #include <shellapi.h>
 #include <shlobj.h>
-#include <windows.h>  // windows.h must be included first
 #include <wrl/client.h>
-
 #include "base/bind.h"
 #include "base/callback_helpers.h"
 #include "base/files/file_path.h"

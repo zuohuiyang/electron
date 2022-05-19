@@ -2,8 +2,6 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#include "shell/common/skia_util.h"
-
 #include <string>
 
 #include "base/files/file_path.h"
@@ -14,6 +12,9 @@
 #include "net/base/data_url.h"
 #include "shell/common/asar/asar_util.h"
 #include "shell/common/node_includes.h"
+// clang-format off
+#include "shell/common/skia_util.h"
+// clang-format on
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkImageInfo.h"
 #include "third_party/skia/include/core/SkPixelRef.h"
