@@ -24,6 +24,7 @@ import sys
 import traceback
 
 from functools import partial
+from lib.util import get_buildtools_executable
 
 try:
     from subprocess import DEVNULL  # py3k
@@ -31,7 +32,7 @@ except ImportError:
     DEVNULL = open(os.devnull, "wb")
 
 
-DEFAULT_EXTENSIONS = 'c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx'
+DEFAULT_EXTENSIONS = 'c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx,mm'
 DEFAULT_CLANG_FORMAT_IGNORE = '.clang-format-ignore'
 
 
@@ -240,7 +241,7 @@ def main():
         '--clang-format-executable',
         metavar='EXECUTABLE',
         help='path to the clang-format executable',
-        default='clang-format')
+        default=get_buildtools_executable('clang-format'))
     parser.add_argument(
         '--extensions',
         help='comma separated list of file extensions (default: {})'.format(
