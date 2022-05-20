@@ -28,9 +28,7 @@
 #include "node_platform.h"
 #include "tracing/agent.h"
 
-// clang-format off
 #include "electron/pop_node_defines.h"
-// clang-format on
 
 // Alternative to NODE_MODULE_CONTEXT_AWARE_X.
 // Allows to explicitly register builtin modules instead of using

@@ -5,10 +5,13 @@
 #include "shell/browser/browser.h"
 
 // must come before other includes. fixes bad #defines from <shlwapi.h>.
+#include "base/win/shlwapi.h"  // NOLINT(build/include_order)
+
+#include <windows.h>  // NOLINT(build/include_order)
+
 #include <atlbase.h>   // NOLINT(build/include_order)
 #include <shlobj.h>    // NOLINT(build/include_order)
 #include <shobjidl.h>  // NOLINT(build/include_order)
-#include <windows.h>   // NOLINT(build/include_order)
 
 #include "base/base_paths.h"
 #include "base/file_version_info.h"
@@ -20,7 +23,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/win/registry.h"
-#include "base/win/shlwapi.h"  // NOLINT(build/include_order)
 #include "base/win/win_util.h"
 #include "base/win/windows_version.h"
 #include "chrome/browser/icon_manager.h"

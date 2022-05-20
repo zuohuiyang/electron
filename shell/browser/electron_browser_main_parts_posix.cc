@@ -4,6 +4,8 @@
 
 // Most code came from: chrome/browser/chrome_browser_main_posix.cc.
 
+#include "shell/browser/electron_browser_main_parts.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
@@ -17,7 +19,6 @@
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "shell/browser/browser.h"
-#include "shell/browser/electron_browser_main_parts.h"
 
 namespace electron {
 

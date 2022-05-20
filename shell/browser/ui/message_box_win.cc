@@ -2,9 +2,9 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-// clang-format off
+#include "shell/browser/ui/message_box.h"
+
 #include <windows.h>  // windows.h must be included first
-// clang-format on
 
 #include <commctrl.h>
 
@@ -19,7 +19,6 @@
 #include "base/win/scoped_gdi_object.h"
 #include "shell/browser/browser.h"
 #include "shell/browser/native_window_views.h"
-#include "shell/browser/ui/message_box.h"
 #include "shell/browser/ui/win/dialog_thread.h"
 #include "shell/browser/unresponsive_suppressor.h"
 #include "ui/gfx/icon_util.h"

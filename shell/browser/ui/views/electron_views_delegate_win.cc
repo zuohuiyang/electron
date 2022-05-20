@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE-CHROMIUM file.
 
+#include "shell/browser/ui/views/electron_views_delegate.h"
+
 #include <dwmapi.h>
 #include <shellapi.h>
 
@@ -9,7 +11,6 @@
 
 #include "base/bind.h"
 #include "base/task/thread_pool.h"
-#include "shell/browser/ui/views/electron_views_delegate.h"
 
 namespace {
 

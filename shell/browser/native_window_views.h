@@ -5,12 +5,13 @@
 #ifndef ELECTRON_SHELL_BROWSER_NATIVE_WINDOW_VIEWS_H_
 #define ELECTRON_SHELL_BROWSER_NATIVE_WINDOW_VIEWS_H_
 
+#include "shell/browser/native_window.h"
+
 #include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "shell/browser/native_window.h"
 #include "shell/common/api/api.mojom.h"
 #include "third_party/skia/include/core/SkRegion.h"
 #include "ui/views/widget/widget_observer.h"

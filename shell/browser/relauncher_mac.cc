@@ -2,6 +2,8 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
+#include "shell/browser/relauncher.h"
+
 #include <sys/event.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -13,7 +15,6 @@
 #include "base/posix/eintr_wrapper.h"
 #include "base/process/launch.h"
 #include "base/strings/sys_string_conversions.h"
-#include "shell/browser/relauncher.h"
 
 namespace relauncher {
 

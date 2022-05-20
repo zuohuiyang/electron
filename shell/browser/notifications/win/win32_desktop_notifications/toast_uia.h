@@ -5,10 +5,10 @@
 #ifndef ELECTRON_SHELL_BROWSER_NOTIFICATIONS_WIN_WIN32_DESKTOP_NOTIFICATIONS_TOAST_UIA_H_
 #define ELECTRON_SHELL_BROWSER_NOTIFICATIONS_WIN_WIN32_DESKTOP_NOTIFICATIONS_TOAST_UIA_H_
 
+#include "shell/browser/notifications/win/win32_desktop_notifications/toast.h"
+
 #include <UIAutomationCore.h>
 #include <combaseapi.h>
-
-#include "shell/browser/notifications/win/win32_desktop_notifications/toast.h"
 
 namespace electron {
 

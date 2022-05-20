@@ -2,6 +2,8 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
+#include "shell/browser/relauncher.h"
+
 #include <windows.h>
 
 #include "base/logging.h"
@@ -10,7 +12,6 @@
 #include "base/win/scoped_handle.h"
 #include "sandbox/win/src/nt_internals.h"
 #include "sandbox/win/src/win_utils.h"
-#include "shell/browser/relauncher.h"
 #include "ui/base/win/shell.h"
 
 namespace relauncher {

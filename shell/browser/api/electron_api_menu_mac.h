@@ -5,9 +5,10 @@
 #ifndef ELECTRON_SHELL_BROWSER_API_ELECTRON_API_MENU_MAC_H_
 #define ELECTRON_SHELL_BROWSER_API_ELECTRON_API_MENU_MAC_H_
 
+#include "shell/browser/api/electron_api_menu.h"
+
 #include <map>
 
-#include "shell/browser/api/electron_api_menu.h"
 #import "shell/browser/ui/cocoa/electron_menu_controller.h"
 
 using base::scoped_nsobject;

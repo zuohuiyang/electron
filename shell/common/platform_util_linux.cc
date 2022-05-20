@@ -2,6 +2,8 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
+#include "shell/common/platform_util.h"
+
 #include <fcntl.h>
 #include <stdio.h>
 
@@ -24,7 +26,6 @@
 #include "dbus/bus.h"
 #include "dbus/message.h"
 #include "dbus/object_proxy.h"
-#include "shell/common/platform_util.h"
 #include "shell/common/platform_util_internal.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/gtk/gtk_util.h"  // nogncheck

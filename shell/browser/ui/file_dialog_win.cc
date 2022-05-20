@@ -2,10 +2,11 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
+#include "shell/browser/ui/file_dialog.h"
+
 #include <windows.h>  // windows.h must be included first
 
 #include "base/win/shlwapi.h"  // NOLINT(build/include_order)
-#include "shell/browser/ui/file_dialog.h"
 
 // atlbase.h for CComPtr
 #include <atlbase.h>   // NOLINT(build/include_order)

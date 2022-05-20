@@ -2,9 +2,7 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-// clang-format off
 #include <windows.h>  // windows.h must be included first
-// clang-format on
 
 #include <atlbase.h>  // ensures that ATL statics like `_AtlWinModule` are initialized (it's an issue in static debug build)
 #include <shellapi.h>

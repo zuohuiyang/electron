@@ -2,6 +2,8 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
+#include "shell/browser/relauncher.h"
+
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/prctl.h>
@@ -12,7 +14,6 @@
 #include "base/logging.h"
 #include "base/process/launch.h"
 #include "base/synchronization/waitable_event.h"
-#include "shell/browser/relauncher.h"
 
 namespace relauncher {
 

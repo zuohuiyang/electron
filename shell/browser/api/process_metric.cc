@@ -10,8 +10,9 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 #if BUILDFLAG(IS_WIN)
-#include <psapi.h>
 #include <windows.h>
+
+#include <psapi.h>
 
 #include "base/win/win_util.h"
 #endif
