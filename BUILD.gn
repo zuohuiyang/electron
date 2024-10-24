@@ -633,6 +633,7 @@ source_set("electron_lib") {
   sources = filenames.lib_sources
   if (is_win) {
     sources += filenames.lib_sources_win
+    deps += [ "//chrome/chrome_elf" ]
   }
   if (is_mac) {
     sources += filenames.lib_sources_mac
@@ -1686,8 +1687,16 @@ if (is_mac) {
     }
   }
 
-  executable("electron_app") {
+  electron_app_target = "electron_app"
+  if (is_win) {
+    electron_app_target = "electron_app_initial"
+  }
+
+  executable(electron_app_target) {
     output_name = electron_project_name
+    if (is_win) {
+      output_dir = "$root_out_dir/initialexe"
+    }
 
     # Perform full ThinLTO optimization in the link step for the main binary,
     # matching what Chrome does for its main executable. The default
@@ -1742,14 +1751,22 @@ if (is_mac) {
 
       deps += [
         "//chrome/app:exit_code_watcher",
+        "//chrome/chrome_elf",
         "//components/crash/core/app:run_as_crashpad_handler",
+        "//electron/shell/common/dll_blocker:config_wire",
       ]
 
       # Ship the WER runtime exception helper next to the executable so that
       # crashpad can register it; see :electron_wer.
       data_deps += [ ":electron_wer" ]
 
-      ldflags = [ "/DELAYLOAD:ffmpeg.dll" ]
+      ldflags = [
+        "/DELAYLOAD:ffmpeg.dll",
+
+        # Native addon headers and release uploads expect this at the root.
+        "/IMPLIB:" + rebase_path("$root_out_dir/$electron_project_name.lib",
+                                 root_build_dir),
+      ]
 
       libs = [
         "comctl32.lib",
@@ -1808,6 +1825,21 @@ if (is_mac) {
   }
 
   if (is_win) {
+    action("electron_app") {
+      script = "build/reorder-electron-imports.py"
+      inputs = [
+        "$root_out_dir/initialexe/$electron_project_name.exe",
+        "$root_out_dir/initialexe/$electron_project_name.exe.pdb",
+      ]
+      outputs = [
+        "$root_out_dir/$electron_project_name.exe",
+        "$root_out_dir/$electron_project_name.exe.pdb",
+      ]
+      args = rebase_path(inputs + outputs, root_build_dir)
+      deps = [ ":electron_app_initial" ]
+      data_deps = [ ":electron_app_initial" ]
+    }
+
     # Windows Error Reporting runtime exception helper module. WerFault.exe
     # loads this DLL out-of-process for crashes that bypass crashpad's
     # in-process handler (e.g. __fastfail / STATUS_STACK_BUFFER_OVERRUN) and
@@ -1838,6 +1870,17 @@ if (is_mac) {
 
     group("electron_symbols") {
       deps = [ ":electron_app_symbols" ]
+      if (is_win) {
+        deps += [ ":electron_elf_symbols" ]
+      }
+    }
+
+    if (is_win) {
+      extract_symbols("electron_elf_symbols") {
+        binary = "$root_out_dir/electron_elf.dll"
+        symbol_dir = "$root_out_dir/breakpad_symbols"
+        deps = [ "//chrome/chrome_elf" ]
+      }
     }
   }
 }

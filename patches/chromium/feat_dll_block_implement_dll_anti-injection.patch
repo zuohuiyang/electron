@@ -1,0 +1,739 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Yang Liu <yangliu.leo@bytedance.com>
+Date: Fri, 13 Sep 2024 16:57:50 +0800
+Subject: feat: support application DLL blocklists in the early loading
+ framework
+
+Adapt the original dllBlocker implementation to Chromium 156. Store application
+blocklists in the registry and initialize the existing NtMapViewOfSection hook
+before Electron starts. Keep Chromium's startup safety beacon and buffer blocked
+DLL notifications until the application registers its callback.
+
+Use native registry access and a NUL-separated UTF-8 cross-module interface.
+Preserve the original TTBlocklist REG_SZ JSON array using JsonCpp, so existing
+application blocklists remain effective without a storage migration.
+Electron initializes its own crash reporter and extension-point policy.
+
+diff --git a/chrome/chrome_elf/BUILD.gn b/chrome/chrome_elf/BUILD.gn
+index 0f2c819248a6e3e2895d17a44fd9929e8fdf9cd1..fc20dc24f0e55ace713b2063cba2697b8a47b42d 100644
+--- a/chrome/chrome_elf/BUILD.gn
++++ b/chrome/chrome_elf/BUILD.gn
+@@ -49,6 +49,8 @@ static_library("test_stubs") {
+ }
+ 
+ shared_library("chrome_elf") {
++  output_name = "electron_elf"
++
+   sources = [
+     "chrome_elf.def",
+     "chrome_elf_main.cc",
+@@ -75,9 +77,12 @@ shared_library("chrome_elf") {
+     "//build/config/win:delayloads_not_for_child_dll",
+   ]
+ 
++  # Retained crash exports use version helpers after early initialization.
++  ldflags = [ "/DELAYLOAD:version.dll" ]
++
+   if (current_cpu == "x86") {
+     # Don"t set an x64 base address (to avoid breaking HE-ASLR).
+-    ldflags = [ "/BASE:0x01c20000" ]
++    ldflags += [ "/BASE:0x01c20000" ]
+   }
+ }
+ 
+@@ -190,6 +195,8 @@ source_set("third_party_dlls") {
+   ]
+   sources = [
+     "third_party_dlls/beacon.cc",
++    "third_party_dlls/electron_blocklist.cc",
++    "third_party_dlls/electron_blocklist.h",
+     "third_party_dlls/hardcoded_blocklist.cc",
+     "third_party_dlls/hardcoded_blocklist.h",
+     "third_party_dlls/hook.cc",
+@@ -201,15 +208,18 @@ source_set("third_party_dlls") {
+     "third_party_dlls/packed_list_file.h",
+   ]
+   deps = [
++    ":chrome_elf_main_include",
+     ":constants",
+     ":crash",
+     ":nt_registry",
+     ":pe_image_safe",
+     ":sha1",
+     "//base:base_static",
++    "//electron/shell/common/dll_blocker:config",
+     "//chrome/install_static:install_static_util",
+     "//sandbox/policy:win_hook_util",
+     "//sandbox/win:service_resolver",
++    "//third_party/jsoncpp",
+   ]
+   public_deps = [ ":third_party_shared_defines" ]
+ }
+diff --git a/chrome/chrome_elf/chrome_elf.def b/chrome/chrome_elf/chrome_elf.def
+index 7303c69c58ae1df32c6a91320bfb5d8dbc874f71..d0c9eb1e51bb099fe9544763ff2e8edb8dada266 100644
+--- a/chrome/chrome_elf/chrome_elf.def
++++ b/chrome/chrome_elf/chrome_elf.def
+@@ -1,7 +1,7 @@
+ ; Copyright 2013 The Chromium Authors
+ ; Use of this source code is governed by a BSD-style license that can be
+ ; found in the LICENSE file.
+-LIBRARY  "chrome_elf.dll"
++LIBRARY  "electron_elf.dll"
+ 
+ EXPORTS
+   ; From components/crash/core/app/crash_export_stubs.cc
+@@ -23,6 +23,11 @@ EXPORTS
+   DumpProcessWithoutCrash
+   GetUserDataDirectoryThunk
+   IsTemporaryUserDataDirectoryCreatedForHeadless
++  SetDllBlockCallback
++  GetDllBlockState
++  SetDllBlockState
++  SetDllBlocklist
++  GetCurrentDllBlocklist
+   SignalChromeElf
+   SignalInitializeCrashReporting
+   IsExtensionPointDisableSet
+diff --git a/chrome/chrome_elf/chrome_elf_main.cc b/chrome/chrome_elf/chrome_elf_main.cc
+index 429b4df9eb4dcb278a5e7a97fda09a0a693951f0..129a1fc76538da2c52cfd644f3949f0503be010b 100644
+--- a/chrome/chrome_elf/chrome_elf_main.cc
++++ b/chrome/chrome_elf/chrome_elf_main.cc
+@@ -12,7 +12,10 @@
+ #include "chrome/chrome_elf/chrome_elf_security.h"
+ #include "chrome/chrome_elf/crash/crash_helper.h"
+ #include "chrome/chrome_elf/third_party_dlls/beacon.h"
++#include "chrome/chrome_elf/third_party_dlls/electron_blocklist.h"
++#include "chrome/chrome_elf/third_party_dlls/hook.h"
+ #include "chrome/chrome_elf/third_party_dlls/main.h"
++#include "chrome/chrome_elf/third_party_dlls/public_api.h"
+ #include "chrome/install_static/install_details.h"
+ #include "chrome/install_static/install_util.h"
+ #include "chrome/install_static/product_install_details.h"
+@@ -31,7 +34,9 @@ void SignalInitializeCrashReporting() {
+ }
+ 
+ void SignalChromeElf() {
+-  third_party_dlls::ResetBeacon();
++  if (IsThirdPartyInitialized()) {
++    third_party_dlls::ResetBeacon();
++  }
+ }
+ 
+ bool GetUserDataDirectoryThunk(wchar_t* user_data_dir,
+@@ -75,24 +80,13 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved) {
+ 
+     if (install_static::IsBrowserProcess()) {
+       __try {
+-        // Disable third party extension points.
+-        elf_security::EarlyBrowserSecurity();
+-
+         // Initialize the blocking of third-party DLLs if the initialization of
+         // the safety beacon succeeds.
+         if (third_party_dlls::LeaveSetupBeacon())
+           third_party_dlls::Init();
+       } __except (elf_crash::GenerateCrashDump(GetExceptionInformation())) {
+       }
+-    } else if (!install_static::IsCrashpadHandlerProcess()) {
+-      SignalInitializeCrashReporting();
+-      // CRT on initialization installs an exception filter which calls
+-      // TerminateProcess. We need to hook CRT's attempt to set an exception.
+-      elf_crash::DisableSetUnhandledExceptionFilter();
+     }
+-
+-  } else if (reason == DLL_PROCESS_DETACH) {
+-    elf_crash::ShutdownCrashReporting();
+   }
+   return TRUE;
+ }
+@@ -112,3 +106,24 @@ bool IsBrowserProcess() {
+ bool IsExtensionPointDisableSet() {
+   return elf_security::IsExtensionPointDisableSet();
+ }
++
++void SetDllBlockCallback(DllBlockCallback callback) {
++  third_party_dlls::SetDllBlockCallback(callback);
++}
++
++bool GetDllBlockState(int& state) {
++  return third_party_dlls::GetBeaconState(state);
++}
++
++bool SetDllBlockState(int state) {
++  return third_party_dlls::SetBeaconState(state);
++}
++
++bool SetDllBlocklist(const char* blocklist, size_t size) {
++  return third_party_dlls::WriteBlocklistToRegistry(blocklist, size);
++}
++
++bool GetCurrentDllBlocklist(const char** blocklist, size_t* size) {
++  return IsThirdPartyInitialized() &&
++         third_party_dlls::GetCurrentDllBlocklist(blocklist, size);
++}
+diff --git a/chrome/chrome_elf/chrome_elf_main.h b/chrome/chrome_elf/chrome_elf_main.h
+index 90fa652d42cdcb5225066ff83c130be430df91b7..88dc240846805bab4d8511aabc0ddbb2925c97db 100644
+--- a/chrome/chrome_elf/chrome_elf_main.h
++++ b/chrome/chrome_elf/chrome_elf_main.h
+@@ -5,6 +5,8 @@
+ #ifndef CHROME_CHROME_ELF_CHROME_ELF_MAIN_H_
+ #define CHROME_CHROME_ELF_CHROME_ELF_MAIN_H_
+ 
++#include <stddef.h>
++
+ // These functions are the cross-module import interface to chrome_elf.dll.
+ // It is used by chrome.exe, chrome.dll and other clients of chrome_elf.
+ // In tests, these functions are stubbed by implementations in
+@@ -42,6 +44,22 @@ bool IsBrowserProcess();
+ // was set
+ bool IsExtensionPointDisableSet();
+ 
++using DllBlockCallback = void (*)(const char* dll_name, size_t size);
++
++// The callback may run on any thread and under the Windows loader lock.
++void SetDllBlockCallback(DllBlockCallback callback);
++
++// Values correspond to blocklist::BlocklistState.
++bool GetDllBlockState(int& state);
++bool SetDllBlockState(int state);
++
++// UTF-8 names separated by NUL; size includes each name's terminator.
++// An empty buffer represents an empty list. Changes apply on the next launch.
++bool SetDllBlocklist(const char* blocklist, size_t size);
++
++// Returns immutable storage owned by this module for the active list.
++bool GetCurrentDllBlocklist(const char** blocklist, size_t* size);
++
+ }  // extern "C"
+ 
+ #endif  // CHROME_CHROME_ELF_CHROME_ELF_MAIN_H_
+diff --git a/chrome/chrome_elf/third_party_dlls/beacon.cc b/chrome/chrome_elf/third_party_dlls/beacon.cc
+index d5617acdee1e1758f2127f6a9b33a20161996c16..f4ac52bfbef8ea9a5acdf01653eeb3e11466f402 100644
+--- a/chrome/chrome_elf/third_party_dlls/beacon.cc
++++ b/chrome/chrome_elf/third_party_dlls/beacon.cc
+@@ -7,14 +7,18 @@
+ #include "chrome/chrome_elf/blocklist_constants.h"
+ #include "chrome/chrome_elf/nt_registry/nt_registry.h"
+ #include "chrome/install_static/install_util.h"
++#include "electron/shell/common/dll_blocker_config.h"
+ 
+ namespace third_party_dlls {
+ 
+ bool LeaveSetupBeacon() {
++  if (electron::GetDllBlockerRegistryPath().empty()) {
++    return false;
++  }
+   HANDLE key_handle = INVALID_HANDLE_VALUE;
+ 
+   if (!nt::CreateRegKey(nt::HKCU,
+-                        install_static::GetRegistryPath()
++                        electron::GetDllBlockerRegistryPath()
+                             .append(blocklist::kRegistryBeaconKeyName)
+                             .c_str(),
+                         KEY_QUERY_VALUE | KEY_SET_VALUE, &key_handle)) {
+@@ -64,10 +68,13 @@ bool LeaveSetupBeacon() {
+ }
+ 
+ bool ResetBeacon() {
++  if (electron::GetDllBlockerRegistryPath().empty()) {
++    return false;
++  }
+   HANDLE key_handle = INVALID_HANDLE_VALUE;
+ 
+   if (!nt::CreateRegKey(nt::HKCU,
+-                        install_static::GetRegistryPath()
++                        electron::GetDllBlockerRegistryPath()
+                             .append(blocklist::kRegistryBeaconKeyName)
+                             .c_str(),
+                         KEY_QUERY_VALUE | KEY_SET_VALUE, &key_handle)) {
+@@ -96,4 +103,40 @@ bool ResetBeacon() {
+   return true;
+ }
+ 
++bool GetBeaconState(int& state) {
++  const auto path = electron::GetDllBlockerRegistryPath();
++  if (path.empty()) {
++    return false;
++  }
++  DWORD value = blocklist::BLOCKLIST_DISABLED;
++  if (!nt::QueryRegValueDWORD(
++          nt::HKCU, nt::NONE,
++          (path + blocklist::kRegistryBeaconKeyName).c_str(),
++          blocklist::kBeaconState, &value) ||
++      value >= blocklist::BLOCKLIST_STATE_MAX) {
++    state = blocklist::BLOCKLIST_DISABLED;
++    return true;
++  }
++  state = static_cast<int>(value);
++  return true;
++}
++
++bool SetBeaconState(int state) {
++  const auto path = electron::GetDllBlockerRegistryPath();
++  if (path.empty() || state < blocklist::BLOCKLIST_DISABLED ||
++      state >= blocklist::BLOCKLIST_STATE_MAX) {
++    return false;
++  }
++  HANDLE key = nullptr;
++  if (!nt::CreateRegKey(nt::HKCU,
++                        (path + blocklist::kRegistryBeaconKeyName).c_str(),
++                        KEY_SET_VALUE, &key)) {
++    return false;
++  }
++  const bool success =
++      nt::SetRegValueDWORD(key, blocklist::kBeaconState, state);
++  nt::CloseRegKey(key);
++  return success;
++}
++
+ }  // namespace third_party_dlls
+diff --git a/chrome/chrome_elf/third_party_dlls/beacon.h b/chrome/chrome_elf/third_party_dlls/beacon.h
+index b54721b28cdc4c32b686e3c6e02fe6e562b0d7ec..d0c76345fb47e62742226908f7c411faae0785ae 100644
+--- a/chrome/chrome_elf/third_party_dlls/beacon.h
++++ b/chrome/chrome_elf/third_party_dlls/beacon.h
+@@ -20,6 +20,9 @@ bool LeaveSetupBeacon();
+ // Returns true if the beacon was successfully set to BLOCKLIST_ENABLED.
+ bool ResetBeacon();
+ 
++bool GetBeaconState(int& state);
++bool SetBeaconState(int state);
++
+ }  // namespace third_party_dlls
+ 
+ #endif  // CHROME_CHROME_ELF_THIRD_PARTY_DLLS_BEACON_H_
+diff --git a/chrome/chrome_elf/third_party_dlls/electron_blocklist.cc b/chrome/chrome_elf/third_party_dlls/electron_blocklist.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..939e63abda11de4d0b933c3bc46229dc17c7beb7
+--- /dev/null
++++ b/chrome/chrome_elf/third_party_dlls/electron_blocklist.cc
+@@ -0,0 +1,177 @@
++// Copyright (c) Electron contributors. All rights reserved.
++// Use of this source code is governed by the MIT license that can be
++// found in the LICENSE file.
++
++#include "chrome/chrome_elf/third_party_dlls/electron_blocklist.h"
++
++#include <windows.h>
++
++#include <algorithm>
++#include <limits>
++#include <memory>
++#include <string_view>
++#include <vector>
++
++#include "chrome/chrome_elf/nt_registry/nt_registry.h"
++#include "chrome/chrome_elf/third_party_dlls/packed_list_format.h"
++#include "electron/shell/common/dll_blocker_config.h"
++#include "third_party/jsoncpp/source/include/json/reader.h"
++#include "third_party/jsoncpp/source/include/json/writer.h"
++
++namespace third_party_dlls {
++namespace {
++
++constexpr wchar_t kBlocklistValue[] = L"TTBlocklist";
++
++// Written once in DllMain before installing the hook, then read-only.
++std::vector<std::string>& Blocklist() {
++  static auto* const blocklist = new std::vector<std::string>();
++  return *blocklist;
++}
++
++std::string& CurrentBlocklist() {
++  static auto* const blocklist = new std::string();
++  return *blocklist;
++}
++
++bool UTF8ToWide(std::string_view value, std::wstring* result) {
++  if (value.empty() || value.size() > std::numeric_limits<int>::max()) {
++    return false;
++  }
++  const int length =
++      ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
++                            static_cast<int>(value.size()), nullptr, 0);
++  if (length == 0) {
++    return false;
++  }
++  result->resize(length);
++  return ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
++                               static_cast<int>(value.size()), result->data(),
++                               length) == length;
++}
++
++bool WideToUTF8(const std::wstring& value, std::string* result) {
++  if (value.empty() || value.size() > std::numeric_limits<int>::max()) {
++    return false;
++  }
++  const int length = ::WideCharToMultiByte(
++      CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
++      static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
++  if (length == 0) {
++    return false;
++  }
++  result->resize(length);
++  return ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
++                               static_cast<int>(value.size()), result->data(),
++                               length, nullptr, nullptr) == length;
++}
++
++}  // namespace
++
++bool WriteBlocklistToRegistry(const char* blocklist, size_t size) {
++  const auto path = electron::GetDllBlockerRegistryPath();
++  if (path.empty() || (!blocklist && size != 0)) {
++    return false;
++  }
++
++  Json::Value names(Json::arrayValue);
++  std::string_view remaining(blocklist ? blocklist : "", size);
++  while (!remaining.empty()) {
++    const size_t end = remaining.find('\0');
++    if (end == std::string_view::npos || end == 0) {
++      return false;
++    }
++    std::wstring name;
++    if (!UTF8ToWide(remaining.substr(0, end), &name)) {
++      return false;
++    }
++    names.append(std::string(remaining.substr(0, end)));
++    remaining.remove_prefix(end + 1);
++  }
++  Json::StreamWriterBuilder writer;
++  writer["indentation"] = "";
++  std::wstring registry_value;
++  if (!UTF8ToWide(Json::writeString(writer, names), &registry_value)) {
++    return false;
++  }
++
++  HANDLE key = nullptr;
++  if (!nt::CreateRegKey(nt::HKCU, (path + kThirdPartyRegKeyName).c_str(),
++                        KEY_SET_VALUE, &key)) {
++    return false;
++  }
++  const bool success = nt::SetRegValueSZ(key, kBlocklistValue, registry_value);
++  nt::CloseRegKey(key);
++  return success;
++}
++
++ThirdPartyStatus InitElectronBlocklist() {
++  const auto path = electron::GetDllBlockerRegistryPath();
++  if (path.empty()) {
++    return ThirdPartyStatus::kFileEmpty;
++  }
++  std::wstring registry_value;
++  if (!nt::QueryRegValueSZ(nt::HKCU, nt::NONE,
++                           (path + kThirdPartyRegKeyName).c_str(),
++                           kBlocklistValue, &registry_value)) {
++    return ThirdPartyStatus::kFileEmpty;
++  }
++  std::string json;
++  if (!WideToUTF8(registry_value, &json)) {
++    return ThirdPartyStatus::kFileEmpty;
++  }
++  Json::CharReaderBuilder builder;
++  Json::CharReaderBuilder::strictMode(&builder.settings_);
++  builder["collectComments"] = false;
++  builder["stackLimit"] = 16;
++  std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
++  Json::Value names;
++  if (!reader->parse(json.data(), json.data() + json.size(), &names, nullptr) ||
++      !names.isArray()) {
++    return ThirdPartyStatus::kFileEmpty;
++  }
++
++  std::vector<std::string> blocklist;
++  std::string current_blocklist;
++  for (const auto& name : names) {
++    // Preserve the original behavior of ignoring non-string entries.
++    if (!name.isString()) {
++      continue;
++    }
++    std::string utf8 = name.asString();
++    std::wstring validated_name;
++    if (utf8.find('\0') != std::string::npos ||
++        !UTF8ToWide(utf8, &validated_name)) {
++      continue;
++    }
++    // Match the ASCII case folding used by GetDataFromImage().
++    for (auto& character : utf8) {
++      if (character >= 'A' && character <= 'Z') {
++        character += 'a' - 'A';
++      }
++    }
++    current_blocklist.append(utf8);
++    current_blocklist.push_back('\0');
++    blocklist.push_back(std::move(utf8));
++  }
++  Blocklist() = std::move(blocklist);
++  CurrentBlocklist() = std::move(current_blocklist);
++  return Blocklist().empty() ? ThirdPartyStatus::kFileEmpty
++                             : ThirdPartyStatus::kSuccess;
++}
++
++bool IsElectronDllBlocked(const std::string& name) {
++  return !name.empty() && std::find(Blocklist().begin(), Blocklist().end(),
++                                    name) != Blocklist().end();
++}
++
++bool GetCurrentDllBlocklist(const char** blocklist, size_t* size) {
++  if (!blocklist || !size) {
++    return false;
++  }
++  *blocklist = CurrentBlocklist().data();
++  *size = CurrentBlocklist().size();
++  return true;
++}
++
++}  // namespace third_party_dlls
+diff --git a/chrome/chrome_elf/third_party_dlls/electron_blocklist.h b/chrome/chrome_elf/third_party_dlls/electron_blocklist.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..512f32c69353f48339c63703ee119bf4b6581b3f
+--- /dev/null
++++ b/chrome/chrome_elf/third_party_dlls/electron_blocklist.h
+@@ -0,0 +1,23 @@
++// Copyright (c) Electron contributors. All rights reserved.
++// Use of this source code is governed by the MIT license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_CHROME_ELF_THIRD_PARTY_DLLS_ELECTRON_BLOCKLIST_H_
++#define CHROME_CHROME_ELF_THIRD_PARTY_DLLS_ELECTRON_BLOCKLIST_H_
++
++#include <stddef.h>
++
++#include <string>
++
++#include "chrome/chrome_elf/third_party_dlls/status_codes.h"
++
++namespace third_party_dlls {
++
++ThirdPartyStatus InitElectronBlocklist();
++bool IsElectronDllBlocked(const std::string& name);
++bool WriteBlocklistToRegistry(const char* blocklist, size_t size);
++bool GetCurrentDllBlocklist(const char** blocklist, size_t* size);
++
++}  // namespace third_party_dlls
++
++#endif  // CHROME_CHROME_ELF_THIRD_PARTY_DLLS_ELECTRON_BLOCKLIST_H_
+diff --git a/chrome/chrome_elf/third_party_dlls/hook.cc b/chrome/chrome_elf/third_party_dlls/hook.cc
+index 0f9b6da764fe6c360cb613b333b827258b8645cf..092559a60d41738b966d29a08c240abcc57c4396 100644
+--- a/chrome/chrome_elf/third_party_dlls/hook.cc
++++ b/chrome/chrome_elf/third_party_dlls/hook.cc
+@@ -14,16 +14,14 @@
+ #include <atomic>
+ #include <limits>
+ #include <string>
++#include <vector>
+ 
+ #include "base/compiler_specific.h"
+ #include "chrome/chrome_elf/crash/crash_helper.h"
+ #include "chrome/chrome_elf/pe_image_safe/pe_image_safe.h"
+-#include "chrome/chrome_elf/sha1/sha1.h"
+-#include "chrome/chrome_elf/third_party_dlls/hardcoded_blocklist.h"
++#include "chrome/chrome_elf/third_party_dlls/electron_blocklist.h"
+ #include "chrome/chrome_elf/third_party_dlls/logs.h"
+ #include "chrome/chrome_elf/third_party_dlls/main.h"
+-#include "chrome/chrome_elf/third_party_dlls/packed_list_file.h"
+-#include "chrome/chrome_elf/third_party_dlls/packed_list_format.h"
+ #include "chrome/chrome_elf/third_party_dlls/public_api.h"
+ #include "sandbox/policy/win/hook_util/hook_util.h"
+ #include "sandbox/win/src/service_resolver.h"
+@@ -35,6 +33,25 @@ namespace third_party_dlls {
+ 
+ namespace {
+ 
++SRWLOCK g_callback_lock = SRWLOCK_INIT;
++DllBlockCallback g_dll_block_callback = nullptr;
++std::vector<std::string>& PendingBlocks() {
++  static auto* const blocks = new std::vector<std::string>();
++  return *blocks;
++}
++
++void NotifyDllBlocked(const std::string& name) {
++  ::AcquireSRWLockExclusive(&g_callback_lock);
++  const auto callback = g_dll_block_callback;
++  if (!callback) {
++    PendingBlocks().push_back(name);
++  }
++  ::ReleaseSRWLockExclusive(&g_callback_lock);
++  if (callback) {
++    callback(name.data(), name.size());
++  }
++}
++
+ typedef ULONG SECTION_INHERIT;
+ 
+ typedef NTSTATUS(WINAPI* NtMapViewOfSectionFunction)(
+@@ -270,44 +287,16 @@ NTSTATUS NewNtMapViewOfSectionImpl(
+     return ret;
+   }
+ 
+-  // Note that one of either image_name or section_basename can be empty.
+-  elf_sha1::Digest image_name_hash;
+-  if (!image_name.empty())
+-    image_name_hash = elf_sha1::SHA1HashString(image_name);
+-  elf_sha1::Digest section_basename_hash;
+-  if (!section_basename.empty())
+-    section_basename_hash = elf_sha1::SHA1HashString(section_basename);
+-  elf_sha1::Digest fingerprint_hash = elf_sha1::SHA1HashString(
+-      GetFingerprintString(time_date_stamp, image_size));
+-
+-  // Check sources for blocklist decision.
+-  bool block = false;
+-
+-  if (!image_name.empty() &&
+-      IsModuleListed(image_name_hash, fingerprint_hash)) {
+-    // 1) Third-party DLL blocklist, check for image name from PE header.
+-    block = true;
+-  } else if (!section_basename.empty() &&
+-             section_basename_hash != image_name_hash &&
+-             IsModuleListed(section_basename_hash, fingerprint_hash)) {
+-    // 2) Third-party DLL blocklist, check for image name from the section.
+-    block = true;
+-  } else if (!image_name.empty() && DllMatch(image_name)) {
+-    // 3) Hard-coded blocklist with name from PE header (deprecated).
+-    block = true;
+-  } else if (!section_basename.empty() &&
+-             section_basename.compare(image_name) != 0 &&
+-             DllMatch(section_basename)) {
+-    // 4) Hard-coded blocklist with name from the section (deprecated).
+-    block = true;
+-  }
+-  // Else, no block.
++  const bool block = IsElectronDllBlocked(image_name) ||
++                     IsElectronDllBlocked(section_basename);
+ 
+   // UNMAP the view.  This image is being blocked.
+   if (block) {
+     ::UnmapViewOfFile(*base);
+     *base = nullptr;
+     ret = STATUS_UNSUCCESSFUL;
++    NotifyDllBlocked(IsElectronDllBlocked(section_basename) ? section_basename
++                                                            : image_name);
+   }
+ 
+   // LOG!
+@@ -326,6 +315,19 @@ NTSTATUS NewNtMapViewOfSectionImpl(
+ // Public defines & functions
+ //------------------------------------------------------------------------------
+ 
++void SetDllBlockCallback(DllBlockCallback callback) {
++  std::vector<std::string> pending;
++  ::AcquireSRWLockExclusive(&g_callback_lock);
++  g_dll_block_callback = callback;
++  if (callback) {
++    pending.swap(PendingBlocks());
++  }
++  ::ReleaseSRWLockExclusive(&g_callback_lock);
++  for (const auto& name : pending) {
++    callback(name.data(), name.size());
++  }
++}
++
+ // Interception of NtMapViewOfSection within the current process.
+ // - This/these replacement functions should never be called directly.  They are
+ //   called from the hook patch.
+diff --git a/chrome/chrome_elf/third_party_dlls/hook.h b/chrome/chrome_elf/third_party_dlls/hook.h
+index b533e53fd1d0dd63e0ebcb1e5ff6ecdbc34dee5b..295daf805b1ae443015a18678272691be52a6b08 100644
+--- a/chrome/chrome_elf/third_party_dlls/hook.h
++++ b/chrome/chrome_elf/third_party_dlls/hook.h
+@@ -9,10 +9,13 @@
+ 
+ #include <string>
+ 
++#include "chrome/chrome_elf/chrome_elf_main.h"
+ #include "chrome/chrome_elf/third_party_dlls/status_codes.h"
+ 
+ namespace third_party_dlls {
+ 
++void SetDllBlockCallback(DllBlockCallback callback);
++
+ // Apply hook.
+ // - Ensure the rest of third_party_dlls is initialized before hooking.
+ ThirdPartyStatus ApplyHook();
+diff --git a/chrome/chrome_elf/third_party_dlls/main.cc b/chrome/chrome_elf/third_party_dlls/main.cc
+index 9ee0429a15fb0bad91e4b1d02c41bd10ce359d28..f7262689c98b9768a72f969c9c9a8f09c56ad1f4 100644
+--- a/chrome/chrome_elf/third_party_dlls/main.cc
++++ b/chrome/chrome_elf/third_party_dlls/main.cc
+@@ -12,12 +12,13 @@
+ #include <limits>
+ 
+ #include "chrome/chrome_elf/nt_registry/nt_registry.h"
++#include "chrome/chrome_elf/third_party_dlls/electron_blocklist.h"
+ #include "chrome/chrome_elf/third_party_dlls/hook.h"
+ #include "chrome/chrome_elf/third_party_dlls/logs.h"
+-#include "chrome/chrome_elf/third_party_dlls/packed_list_file.h"
+ #include "chrome/chrome_elf/third_party_dlls/packed_list_format.h"
+ #include "chrome/chrome_elf/third_party_dlls/status_codes.h"
+ #include "chrome/install_static/install_util.h"
++#include "electron/shell/common/dll_blocker_config.h"
+ 
+ namespace third_party_dlls {
+ namespace {
+@@ -36,7 +37,7 @@ bool ResetStatusCodes() {
+ 
+   // If the ThirdParty registry key does not exist, it will be created now.
+   if (!nt::CreateRegKey(nt::HKCU,
+-                        install_static::GetRegistryPath()
++                        electron::GetDllBlockerRegistryPath()
+                             .append(kThirdPartyRegKeyName)
+                             .c_str(),
+                         KEY_WRITE, &key_handle)) {
+@@ -55,7 +56,7 @@ void AddStatusCode(ThirdPartyStatus code) {
+   HANDLE key_handle = nullptr;
+ 
+   if (!nt::CreateRegKey(nt::HKCU,
+-                        install_static::GetRegistryPath()
++                        electron::GetDllBlockerRegistryPath()
+                             .append(kThirdPartyRegKeyName)
+                             .c_str(),
+                         KEY_WRITE | KEY_READ, &key_handle)) {
+@@ -103,15 +104,19 @@ bool Init() {
+   if (!::IsWindows7OrGreater())
+     return false;
+ 
++  if (electron::GetDllBlockerRegistryPath().empty()) {
++    return false;
++  }
++
+   if (!ResetStatusCodes())
+     AddStatusCode(ThirdPartyStatus::kStatusCodeResetFailure);
+ 
+-  // 1) Initialize the blocklist from file
+-  ThirdPartyStatus status = InitFromFile();
++  // 1) Initialize the application blocklist before applying the hook.
++  ThirdPartyStatus status = InitElectronBlocklist();
+   if (status != ThirdPartyStatus::kSuccess) {
+     AddStatusCode(status);
+     // A few status codes are considered acceptable here.
+-    if (!IsStatusCodeSuccessful(status))
++    if (status != ThirdPartyStatus::kFileEmpty)
+       return false;
+   }
+ 
+@@ -119,7 +124,6 @@ bool Init() {
+   status = InitLogs();
+   if (status != ThirdPartyStatus::kSuccess) {
+     AddStatusCode(status);
+-    DeinitFromFile();
+     return false;
+   }
+ 
+@@ -128,7 +132,6 @@ bool Init() {
+   if (status != ThirdPartyStatus::kSuccess) {
+     AddStatusCode(status);
+     DeinitLogs();
+-    DeinitFromFile();
+     return false;
+   }
+ 
+diff --git a/chrome/installer/mini_installer/BUILD.gn b/chrome/installer/mini_installer/BUILD.gn
+index 39cbdeb5f067ba57b65bb903ff36b9f96c4d8631..784f8478aacf914b623b56eb7df2ab0b9be736fc 100644
+--- a/chrome/installer/mini_installer/BUILD.gn
++++ b/chrome/installer/mini_installer/BUILD.gn
+@@ -150,7 +150,7 @@ action("mini_installer_archive") {
+ 
+   inputs = [
+     "$root_out_dir/chrome.dll",
+-    "$root_out_dir/chrome_elf.dll",
++    "$root_out_dir/electron_elf.dll",
+     "$root_out_dir/chrome.exe",
+     "$root_out_dir/locales/en-US.pak",
+     "$root_out_dir/setup.exe",

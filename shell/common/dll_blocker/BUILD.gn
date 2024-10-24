@@ -1,0 +1,23 @@
+# Copyright (c) 2026 Electron contributors.
+# Use of this source code is governed by the MIT license that can be
+# found in the LICENSE file.
+
+assert(is_win)
+
+source_set("config") {
+  sources = [
+    "../dll_blocker_config.cc",
+    "../dll_blocker_config.h",
+  ]
+
+  include_dirs = [ "//electron" ]
+  deps = [
+    "//base:compiler_specific",
+    "//third_party/jsoncpp",
+  ]
+  libs = [ "kernel32.lib" ]
+}
+
+source_set("config_wire") {
+  sources = [ "../dll_blocker_config_wire.cc" ]
+}

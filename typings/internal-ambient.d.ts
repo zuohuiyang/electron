@@ -273,6 +273,7 @@ declare namespace NodeJS {
     _linkedBinding(name: 'electron_browser_notification'): { Notification: typeof Electron.Notification };
     _linkedBinding(name: 'electron_browser_power_monitor'): PowerMonitorBinding;
     _linkedBinding(name: 'electron_browser_power_save_blocker'): { powerSaveBlocker: Electron.PowerSaveBlocker };
+    _linkedBinding(name: 'electron_browser_dll_blocker'): { dllBlocker: Electron.DllBlocker };
     _linkedBinding(name: 'electron_browser_push_notifications'): { pushNotifications: Electron.PushNotifications };
     _linkedBinding(name: 'electron_browser_safe_storage'): { safeStorage: Electron.SafeStorage };
     _linkedBinding(name: 'electron_browser_session'): SessionBinding;

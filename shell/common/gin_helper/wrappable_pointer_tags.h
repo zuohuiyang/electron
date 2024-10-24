@@ -21,6 +21,7 @@ enum ElectronWrappablePointerTag : uint16_t {
   kElectronDesktopCapturer,                 // electron::api::DesktopCapturer
   kElectronDebugger,                        // electron::api::Debugger
   kElectronDownloadItem,                    // electron::api::DownloadItem
+  kElectronDllBlocker,                      // electron::api::DllBlocker
   kElectronEvent,                           // gin_helper::internal::Event
   kElectronGlobalShortcut,                  // electron::api::GlobalShortcut
   kElectronExtensions,                      // electron::api::Extensions

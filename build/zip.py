@@ -24,6 +24,9 @@ EXTENSIONS_TO_SKIP = [
 ]
 
 PATHS_TO_SKIP = [
+  # The final executable has its early DLL import ordered by :electron_app.
+  './initialexe/',
+  'initialexe/',
   # Skip because it is an output of //ui/gl that we don't need.
   'angledata',
   # //electron:electron_wer ships this as <exe name>_wer.dll.

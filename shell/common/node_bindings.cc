@@ -65,7 +65,14 @@
 #include "shell/common/v8_oom_diagnostics.h"
 #endif
 
+#if BUILDFLAG(IS_WIN)
+#define ELECTRON_DLL_BLOCKER_BINDING(V) V(electron_browser_dll_blocker)
+#else
+#define ELECTRON_DLL_BLOCKER_BINDING(V)
+#endif
+
 #define ELECTRON_BROWSER_BINDINGS(V)      \
+  ELECTRON_DLL_BLOCKER_BINDING(V)         \
   V(electron_browser_app)                 \
   V(electron_browser_auto_updater)        \
   V(electron_browser_content_tracing)     \

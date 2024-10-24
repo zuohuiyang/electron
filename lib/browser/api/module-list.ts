@@ -13,6 +13,7 @@ export const browserModuleList: ElectronInternal.ModuleEntry[] = [
   { name: 'crashReporter', loader: () => process._linkedBinding('electron_browser_crash_reporter') },
   { name: 'desktopCapturer', loader: () => require('./desktop-capturer') },
   { name: 'dialog', loader: () => require('./dialog') },
+  ...(process.platform === 'win32' ? [{ name: 'dllBlocker', loader: () => require('./dll-blocker') }] : []),
   { name: 'globalShortcut', loader: () => require('./global-shortcut') },
   { name: 'ipcMain', loader: () => require('./ipc-main') },
   { name: 'ImageView', loader: () => process._linkedBinding('electron_browser_image_view').ImageView },

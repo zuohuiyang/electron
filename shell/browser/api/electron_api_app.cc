@@ -102,6 +102,7 @@
 
 #if BUILDFLAG(IS_WIN)
 #include "base/strings/utf_string_conversions.h"
+#include "shell/browser/api/electron_api_dll_blocker.h"
 #include "shell/browser/notifications/win/windows_toast_activator.h"
 #include "shell/browser/ui/win/jump_list.h"
 #endif
@@ -639,6 +640,9 @@ void App::OnFinishLaunching(base::DictValue launch_info) {
   media::AudioManager::SetGlobalAppName(Browser::Get()->GetName());
 #endif
   Emit("ready", base::Value(std::move(launch_info)));
+#if BUILDFLAG(IS_WIN)
+  DllBlocker::StartListening();
+#endif
 }
 
 void App::OnPreMainMessageLoopRun() {

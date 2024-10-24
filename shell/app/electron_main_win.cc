@@ -22,6 +22,7 @@
 #include "base/win/atl.h"  // ensures that ATL statics like `_AtlWinModule` are initialized (it's an issue in static debug build)
 #include "base/win/dark_mode_support.h"
 #include "chrome/app/exit_code_watcher_win.h"
+#include "chrome/chrome_elf/chrome_elf_main.h"
 #include "components/crash/core/app/crash_switches.h"
 #include "components/crash/core/app/run_as_crashpad_handler_win.h"
 #include "content/public/app/content_main.h"
@@ -86,6 +87,8 @@ void WINAPI FiberBinder(void* params) {
 #endif  // defined(ARCH_CPU_32_BITS)
 
 int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, wchar_t* cmd, int) {
+  // The early DLL has already installed the configured browser-process hook.
+  SignalChromeElf();
 #if defined(ARCH_CPU_32_BITS)
   enum class FiberStatus { kConvertFailed, kCreateFiberFailed, kSuccess };
   FiberStatus fiber_status = FiberStatus::kSuccess;
