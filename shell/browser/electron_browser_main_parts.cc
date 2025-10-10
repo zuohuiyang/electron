@@ -66,6 +66,7 @@
 #include "ui/base/idle/idle.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/ui_base_switches.h"
+#include "base/command_line.h"
 #include "ui/color/color_provider_manager.h"
 #include "ui/display/screen.h"
 #include "ui/linux/display_server_utils.h"
@@ -229,6 +230,14 @@ int ElectronBrowserMainParts::PreEarlyInitialization() {
 }
 
 void ElectronBrowserMainParts::PostEarlyInitialization() {
+  // Add a command-line switch to trigger an ASan crash.
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch("test-asan")) {
+    // Deliberately cause a heap-buffer-overflow to test ASan.
+    volatile char* buffer = new char[10];
+    buffer[10] = 'a';
+  }
+
   // A workaround was previously needed because there was no ThreadTaskRunner
   // set.  If this check is failing we may need to re-add that workaround
   DCHECK(base::SingleThreadTaskRunner::HasCurrentDefault());

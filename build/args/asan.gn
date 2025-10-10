@@ -1,0 +1,15 @@
+import("//electron/build/args/all.gn")
+is_component_build = false
+is_component_ffmpeg = true
+
+is_official_build = false
+
+is_debug = false
+
+
+
+dcheck_always_on = true
+symbol_level = 1
+
+# ASAN specific configurations
+is_asan = true
