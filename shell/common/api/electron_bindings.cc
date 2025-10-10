@@ -4,6 +4,9 @@
 
 #include "shell/common/api/electron_bindings.h"
 
+#include "base/logging.h"
+
+
 #include <algorithm>
 #include <string>
 #include <utility>
@@ -28,6 +31,9 @@
 #include "shell/common/process_util.h"
 #include "shell/common/thread_restrictions.h"
 #include "third_party/blink/renderer/platform/heap/process_heap.h"  // nogncheck
+// 新增：用于标注/抑制 unsafe buffer usage 的宏
+#include "base/compiler_specific.h"
+
 
 namespace electron {
 
@@ -111,9 +117,42 @@ void ElectronBindings::OnCallNextTick(uv_async_t* handle) {
 }
 
 // static
-void ElectronBindings::Crash() {
-  volatile int* zero = nullptr;
-  *zero = 0;
+void ElectronBindings::Crash(v8::Isolate* isolate,
+                             gin_helper::Arguments* args) {
+  std::string crash_type = "default";
+  if (!args->GetNext(&crash_type)) {
+    crash_type = "default";
+  }
+
+  if (crash_type == "uaf") {
+    char* p = new char[10];
+    delete[] p;
+    volatile char sink = 0;
+    // 访问已释放的内存，触发 UAF
+    sink = p[0];
+    p[0] = 'X';
+    LOG(ERROR) << "Triggered UAF" << (int)sink;
+  } else if (crash_type == "overflow") {
+    // 实现缓冲区溢出崩溃
+    char* buffer = new char[10];
+    // 使用循环方式触发缓冲区溢出，避免memset警告
+    for (int i = 0; i < 100; i++) {
+      UNSAFE_BUFFERS(buffer[i] = 'A');  // 超出缓冲区边界
+    }
+  } else if (crash_type == "underflow") {
+    // 实现缓冲区下溢崩溃
+    char* buffer = new char[10];
+    // 将指针算术和写入操作包裹在 UNSAFE_TODO，避免编译器警告
+    UNSAFE_BUFFERS({
+      char* volatile underflow_ptr = buffer - 10;
+      for (int i = 0; i < 10; i++) {
+        underflow_ptr[i] = 'A';  // 访问缓冲区之前的内存
+      }
+    });
+  } else {
+    volatile int* zero = nullptr;
+    *zero = 0;
+  }
 }
 
 // static

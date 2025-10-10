@@ -12,7 +12,14 @@ It adds the following events, properties, and methods:
 
 In sandboxed renderers the `process` object contains only a subset of the APIs:
 
-* `crash()`
+* `crash([crashType])`
+  * `crashType` String (可选) - 崩溃类型，可以是以下值之一：
+    * `'default'` - 使用空指针解引用触发崩溃
+    * `'uaf'` - 使用已释放内存触发崩溃
+    * `'overflow'` - 使用缓冲区上溢触发崩溃
+    * `'underflow'` - 使用缓冲区下溢触发崩溃
+  导致当前进程的主线程崩溃。如果未提供`crashType`，则默认为空指针解引用。
+
 * `hang()`
 * `getCreationTime()`
 * `getHeapStatistics()`
