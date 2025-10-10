@@ -54,7 +54,7 @@ class ElectronBindings {
                           gin_helper::Dictionary* process,
                           base::ProcessMetrics* metrics);
 
-  static void Crash();
+  static void Crash(v8::Isolate* isolate, gin_helper::Arguments* args);
 
   static void DidReceiveMemoryDump(
       v8::Global<v8::Context> context,

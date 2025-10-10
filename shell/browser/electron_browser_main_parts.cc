@@ -15,7 +15,9 @@
 #include "base/feature_list.h"
 #include "base/i18n/rtl.h"
 #include "base/metrics/field_trial.h"
+#include "base/metrics/field_trial_params.h"
 #include "base/nix/xdg_util.h"
+#include "base/no_destructor.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
@@ -23,6 +25,9 @@
 #include "chrome/browser/icon_manager.h"
 #include "chrome/browser/ui/color/chrome_color_mixers.h"
 #include "chrome/common/chrome_switches.h"
+#include "components/gwp_asan/client/gwp_asan_features.h"
+#include "components/memory_system/memory_system.h"
+#include "components/memory_system/parameters.h"
 #include "components/os_crypt/sync/key_storage_config_linux.h"
 #include "components/os_crypt/sync/key_storage_util_linux.h"
 #include "components/os_crypt/sync/os_crypt.h"
@@ -273,16 +278,40 @@ void ElectronBrowserMainParts::PostEarlyInitialization() {
   base::FeatureList::ClearInstanceForTesting();
   InitializeFeatureList();
 
-  // Initialize field trials.
   InitializeFieldTrials();
 
-  // Reinitialize logging now that the app has had a chance to set the app name
-  // and/or user data directory.
+  if (auto* fl = base::FeatureList::GetInstance()) {
+    std::string enable_overrides, disable_overrides;
+    fl->GetFeatureOverrides(&enable_overrides, &disable_overrides, true);
+    LOG(INFO) << "[FeatureList(Post)] overrides enable=" << enable_overrides
+              << " disable=" << disable_overrides;
+  }
+  auto* assoc_trial =
+      base::FeatureList::GetFieldTrial(gwp_asan::internal::kGwpAsanMalloc);
+  LOG(INFO) << "[FeatureTrial(Post)] associated=" << (assoc_trial != nullptr)
+            << (assoc_trial ? std::string(" trial=") +
+                                  assoc_trial->trial_name() + " group=" +
+                                  assoc_trial->GetGroupNameWithoutActivation()
+                            : std::string(""));
+  LOG(INFO) << "[FeatureParams(Post)] TotalPages="
+            << base::GetFieldTrialParamByFeatureAsString(
+                   gwp_asan::internal::kGwpAsanMalloc, "TotalPages", "")
+            << " BrowserTotalPages="
+            << base::GetFieldTrialParamByFeatureAsString(
+                   gwp_asan::internal::kGwpAsanMalloc, "BrowserTotalPages", "");
+
   logging::InitElectronLogging(*base::CommandLine::ForCurrentProcess(),
                                /* is_preinit = */ false);
 
-  // Initialize after user script environment creation.
   fake_browser_process_->PostEarlyInitialization();
+
+  {
+    static base::NoDestructor<memory_system::MemorySystem> memory_system;
+    auto gwp_params =
+        std::make_optional<memory_system::GwpAsanParameters>(true, "");
+    memory_system->Initialize(gwp_params, std::nullopt, std::nullopt);
+    LOG(INFO) << "[MemorySystem(Post)] initialized";
+  }
 }
 
 int ElectronBrowserMainParts::PreCreateThreads() {

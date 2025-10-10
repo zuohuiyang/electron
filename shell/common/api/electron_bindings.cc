@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 #include "shell/common/api/electron_bindings.h"
+#include "base/feature_list.h"
+#include "components/gwp_asan/client/gwp_asan_features.h"
+#include "components/gwp_asan/client/sampling_malloc_shims.h"
 
 #include <algorithm>
 #include <string>
@@ -111,9 +114,73 @@ void ElectronBindings::OnCallNextTick(uv_async_t* handle) {
 }
 
 // static
-void ElectronBindings::Crash() {
-  volatile int* zero = nullptr;
-  *zero = 0;
+void ElectronBindings::Crash(v8::Isolate* isolate,
+                             gin_helper::Arguments* args) {
+  // 在触发前打印 GWP-ASan 的启用状态（注意使用 internal 命名空间）
+  bool gwp_malloc_enabled =
+      base::FeatureList::IsEnabled(gwp_asan::internal::kGwpAsanMalloc);
+  bool gwp_pa_enabled =
+      base::FeatureList::IsEnabled(gwp_asan::internal::kGwpAsanPartitionAlloc);
+  LOG(ERROR) << "GWP-ASan enabled malloc=" << gwp_malloc_enabled
+             << ", partition_alloc=" << gwp_pa_enabled;
+
+  std::string crash_type = "default";
+  if (!args->GetNext(&crash_type)) {
+    crash_type = "default";
+  }
+  LOG(ERROR) << "ElectronBindings::Crash invoked, type=" << crash_type
+             << ", process="
+             << (electron::IsBrowserProcess() ? "browser" : "renderer");
+
+  // ElectronBindings::Crash 内的 "uaf" 分支
+  if (crash_type == "uaf") {
+    constexpr int kUafIterationCount = 1000000;
+    constexpr size_t kSize = 2048;  // 2KB，保证小于系统页大小以便被采样
+    for (int i = 0; i < kUafIterationCount; ++i) {
+      LOG(INFO) << "[uaf_read] iteration " << (i + 1) << " / "
+                << kUafIterationCount;
+      char* p = new char[kSize];
+      bool is_gpa = gwp_asan::IsGwpAsanMallocAllocation(p);
+      LOG(INFO) << "[uaf_read] ptr=" << static_cast<const void*>(p)
+                << " is_gpa=" << (is_gpa ? 1 : 0);
+
+      // 释放后立即访问（UAF）
+      delete[] p;
+      LOG(INFO) << "Triggered UAF-READ begin";
+
+      volatile char sink = 0;
+      char val = 0;
+      UNSAFE_BUFFERS({ val = p[kSize / 2]; });
+      sink ^= val;
+
+      VLOG(1) << "[uaf_read] ptr=" << static_cast<const void*>(p)
+              << " read=" << static_cast<int>(val)
+              << " sink=" << static_cast<int>(sink);
+
+      LOG(INFO) << "Triggered UAF-READ over 1 allocation of " << kSize
+                << " bytes";
+    }
+  } else if (crash_type == "overflow") {
+    // 实现缓冲区溢出崩溃
+    char* buffer = new char[10];
+    // 使用循环方式触发缓冲区溢出，避免memset警告
+    for (int i = 0; i < 100; i++) {
+      UNSAFE_BUFFERS(buffer[i] = 'A');  // 超出缓冲区边界
+    }
+  } else if (crash_type == "underflow") {
+    // 实现缓冲区下溢崩溃
+    char* buffer = new char[10];
+    // 将指针算术和写入操作包裹在 UNSAFE_TODO，避免编译器警告
+    UNSAFE_BUFFERS({
+      char* volatile underflow_ptr = buffer - 10;
+      for (int i = 0; i < 10; i++) {
+        underflow_ptr[i] = 'A';  // 访问缓冲区之前的内存
+      }
+    });
+  } else {
+    volatile int* zero = nullptr;
+    *zero = 0;
+  }
 }
 
 // static

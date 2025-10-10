@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>process.crash demo</title>
+    <style>
+      body { font-family: system-ui; padding: 24px; }
+      button { margin: 6px; padding: 8px 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>process.crash(crashType) Demo</h1>
+    <p>点击下面的按钮触发不同的崩溃类型（应用会立即崩溃）。</p>
+    <div>
+      <button id="default">Crash: default</button>
+      <button id="uaf">Crash: uaf</button>
+      <button id="overflow">Crash: overflow</button>
+      <button id="underflow">Crash: underflow</button>
+      <button id="noarg">Crash: no arg</button>
+    </div>
+    <section>
+      <h3>触发系统堆崩溃（DLL）</h3>
+      <button id="btn-heap-uaf">heap-uaf</button>
+      <button id="btn-heap-overflow">heap-overflow</button>
+      <button id="btn-heap-underflow">heap-underflow</button>
+      <button id="btn-heap-double-free">heap-double-free</button>
+    </section>
+    <script src="./renderer.js"></script>
+  </body>
+</html>
