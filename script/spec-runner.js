@@ -359,6 +359,9 @@ async function runTestUsingElectron (specDir, testName, shouldRerun, additionalA
     argsToPass = argsToPass.filter(arg => (arg.toString().indexOf('--files') === -1 && arg.toString().indexOf('spec/') === -1));
   }
   const runnerArgs = [`electron/${specDir}`, ...argsToPass, ...additionalArgs];
+  if (process.env.ASAN_OPTIONS) {
+    runnerArgs.push('--no-sandbox');
+  }
   if (process.platform === 'linux') {
     runnerArgs.unshift(path.resolve(__dirname, 'dbus_mock.py'), exe);
     exe = 'python3';
