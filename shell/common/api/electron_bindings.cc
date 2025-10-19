@@ -6,6 +6,7 @@
 #include "base/feature_list.h"
 #include "base/logging.h"
 #include "components/gwp_asan/client/gwp_asan_features.h"
+#include "components/gwp_asan/client/sampling_malloc_shims.h"
 
 #include <algorithm>
 #include <string>
@@ -32,10 +33,9 @@
 #include "shell/common/thread_restrictions.h"
 #include "third_party/blink/renderer/platform/heap/process_heap.h"  // nogncheck
 // 新增：用于标注/抑制 unsafe buffer usage 的宏
+#include "TestHeapCorruption/TestHeapCorruption/HeapCorruptionExports.h"
 #include "base/compiler_specific.h"
 #include "base/strings/utf_string_conversions.h"
-#include "TestHeapCorruption/TestHeapCorruption/HeapCorruptionExports.h"
-
 
 namespace electron {
 
@@ -61,8 +61,8 @@ static HMODULE LoadTestHeapCorruptionModule() {
   std::wstring dll_path = dir + L"TestHeapCorruption.dll";
   HMODULE h = LoadLibraryW(dll_path.c_str());
   if (!h) {
-    LOG(ERROR) << "LoadLibraryW failed for "
-               << base::WideToUTF8(dll_path) << ", error=" << GetLastError();
+    LOG(ERROR) << "LoadLibraryW failed for " << base::WideToUTF8(dll_path)
+               << ", error=" << GetLastError();
     return nullptr;
   }
   g_heap_corruption_hmod = h;
@@ -80,7 +80,7 @@ static void CallHeapCorruptionExport(const char* export_name) {
                << ", error=" << GetLastError();
     return;
   }
-  reinterpret_cast<void(*)()>(proc)();
+  reinterpret_cast<void (*)()>(proc)();
 }
 #endif
 
@@ -171,7 +171,7 @@ void ElectronBindings::Crash(v8::Isolate* isolate,
       base::FeatureList::IsEnabled(gwp_asan::internal::kGwpAsanMalloc);
   bool gwp_pa_enabled =
       base::FeatureList::IsEnabled(gwp_asan::internal::kGwpAsanPartitionAlloc);
-  LOG(ERROR) << "GWP-ASan enabled? malloc=" << gwp_malloc_enabled
+  LOG(ERROR) << "GWP-ASan enabled malloc=" << gwp_malloc_enabled
              << ", partition_alloc=" << gwp_pa_enabled;
 
   std::string crash_type = "default";
@@ -182,29 +182,34 @@ void ElectronBindings::Crash(v8::Isolate* isolate,
              << ", process="
              << (electron::IsBrowserProcess() ? "browser" : "renderer");
 
+  // ElectronBindings::Crash 内的 "uaf" 分支
   if (crash_type == "uaf") {
-    // 强化的 UAF：大量中等大小分配，释放后再次访问，提升 GWP‑ASan 命中率
-    constexpr int kIterations = 10000;
-    constexpr size_t kSize = 16384;  // 16KB，中等尺寸更易被采样
-    std::vector<char*> ptrs;
-    ptrs.reserve(kIterations);
-
-    for (int i = 0; i < kIterations; ++i) {
+    constexpr int kUafIterationCount = 10000;
+    constexpr size_t kSize = 2048;  // 2KB，保证小于系统页大小以便被采样
+    for (int i = 0; i < kUafIterationCount; ++i) {
+      LOG(INFO) << "[uaf_read] iteration " << (i + 1) << " / "
+                << kUafIterationCount;
       char* p = new char[kSize];
-      ptrs.push_back(p);
-    }
-    for (auto* p : ptrs) {
-      delete[] p;
-    }
+      bool is_gpa = gwp_asan::IsGwpAsanMallocAllocation(p);
+      LOG(INFO) << "[uaf_read] ptr=" << static_cast<const void*>(p)
+                << " is_gpa=" << (is_gpa ? 1 : 0);
 
-    volatile char sink = 0;
-    for (auto* p : ptrs) {
-      // 访问已释放的内存，触发 UAF
-      sink ^= p[0];
-      p[0] = 'X';
+      // 释放后立即访问（UAF）
+      delete[] p;
+      LOG(INFO) << "Triggered UAF-READ begin";
+
+      volatile char sink = 0;
+      char val = 0;
+      UNSAFE_BUFFERS({ val = p[kSize / 2]; });
+      sink ^= val;
+
+      VLOG(1) << "[uaf_read] ptr=" << static_cast<const void*>(p)
+              << " read=" << static_cast<int>(val)
+              << " sink=" << static_cast<int>(sink);
+
+      LOG(INFO) << "Triggered UAF-READ over 1 allocation of " << kSize
+                << " bytes";
     }
-    LOG(ERROR) << "Triggered UAF over " << kIterations << " allocations of "
-               << kSize << " bytes";
   } else if (crash_type == "overflow") {
     // 实现缓冲区溢出崩溃
     char* buffer = new char[10];
@@ -236,7 +241,8 @@ void ElectronBindings::Crash(v8::Isolate* isolate,
 #endif
   } else if (crash_type == "heap-underflow") {
 #if BUILDFLAG(IS_WIN)
-    LOG(ERROR) << "Heap underflow export is not available in TestHeapCorruption.dll.";
+    LOG(ERROR)
+        << "Heap underflow export is not available in TestHeapCorruption.dll.";
 #else
     LOG(ERROR) << "Heap corruption crash types are only supported on Windows.";
 #endif
