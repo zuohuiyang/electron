@@ -56,6 +56,11 @@
 #include "ui/base/ui_base_switches.h"
 #include "v8/include/v8-snapshot.h"
 
+// 添加：NoDestructor 与 MemorySystem 封装
+#include "base/no_destructor.h"
+#include "components/memory_system/memory_system.h"
+#include "components/memory_system/parameters.h"
+
 #if BUILDFLAG(IS_MAC)
 #include "shell/app/electron_main_delegate_mac.h"
 #endif
@@ -422,6 +427,19 @@ std::optional<int> ElectronMainDelegate::PreBrowserMain() {
   InitializeFeatureList();
   // Initialize mojo core as soon as we have a valid feature list
   content::InitializeMojoCore();
+
+  // 使用 MemorySystem 封装初始化 GWP‑ASan（读取 FeatureList/FieldTrial 参数）
+  {
+    static base::NoDestructor<memory_system::MemorySystem> memory_system;
+    auto gwp_params =
+        std::make_optional<memory_system::GwpAsanParameters>(/*boost_sampling=*/true,
+                                                             /*process_type=*/"Browser");
+    memory_system->Initialize(
+        gwp_params,
+        /*profiling_client_parameters=*/std::nullopt,
+        /*dispatcher_parameters=*/std::nullopt);
+  }
+
 #if BUILDFLAG(IS_MAC)
   RegisterAtomCrApp();
 #endif

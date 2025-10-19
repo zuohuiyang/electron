@@ -230,13 +230,6 @@ int ElectronBrowserMainParts::PreEarlyInitialization() {
 }
 
 void ElectronBrowserMainParts::PostEarlyInitialization() {
-  // Add a command-line switch to trigger an ASan crash.
-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  if (command_line->HasSwitch("test-asan")) {
-    // Deliberately cause a heap-buffer-overflow to test ASan.
-    volatile char* buffer = new char[10];
-    buffer[10] = 'a';
-  }
 
   // A workaround was previously needed because there was no ThreadTaskRunner
   // set.  If this check is failing we may need to re-add that workaround
