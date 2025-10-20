@@ -428,17 +428,8 @@ std::optional<int> ElectronMainDelegate::PreBrowserMain() {
   // Initialize mojo core as soon as we have a valid feature list
   content::InitializeMojoCore();
 
-  // 使用 MemorySystem 封装初始化 GWP‑ASan（读取 FeatureList/FieldTrial 参数）
-  {
-    static base::NoDestructor<memory_system::MemorySystem> memory_system;
-    auto gwp_params =
-        std::make_optional<memory_system::GwpAsanParameters>(/*boost_sampling=*/true,
-                                                             /*process_type=*/"Browser");
-    memory_system->Initialize(
-        gwp_params,
-        /*profiling_client_parameters=*/std::nullopt,
-        /*dispatcher_parameters=*/std::nullopt);
-  }
+  // 统一走 Chrome 风格的 MemorySystem 初始化
+  InitializeMemorySystem();
 
 #if BUILDFLAG(IS_MAC)
   RegisterAtomCrApp();
@@ -536,5 +527,14 @@ void ElectronMainDelegate::ZygoteForked() {
   crash_keys::SetCrashKeysFromCommandLine(*command_line);
 }
 #endif  // BUILDFLAG(IS_LINUX)
+
+void ElectronMainDelegate::InitializeMemorySystem() {
+  static base::NoDestructor<memory_system::MemorySystem> memory_system;
+  auto gwp_params = std::make_optional<memory_system::GwpAsanParameters>(
+      /*boost_sampling=*/true, /*process_type=*/"Browser");
+  memory_system->Initialize(gwp_params,
+                            /*profiling_client_parameters=*/std::nullopt,
+                            /*dispatcher_parameters=*/std::nullopt);
+}
 
 }  // namespace electron

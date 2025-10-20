@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 #include "shell/common/api/electron_bindings.h"
+#include "base/feature_list.h"
+#include "base/logging.h"
+#include "components/gwp_asan/client/gwp_asan_features.h"
 
 #include <algorithm>
 #include <string>
@@ -113,25 +116,53 @@ void ElectronBindings::OnCallNextTick(uv_async_t* handle) {
 }
 
 // static
-void ElectronBindings::Crash(v8::Isolate* isolate, gin_helper::Arguments* args) {
+void ElectronBindings::Crash(v8::Isolate* isolate,
+                             gin_helper::Arguments* args) {
+  // 在触发前打印 GWP-ASan 的启用状态（注意使用 internal 命名空间）
+  bool gwp_malloc_enabled =
+      base::FeatureList::IsEnabled(gwp_asan::internal::kGwpAsanMalloc);
+  bool gwp_pa_enabled =
+      base::FeatureList::IsEnabled(gwp_asan::internal::kGwpAsanPartitionAlloc);
+  LOG(ERROR) << "GWP-ASan enabled? malloc=" << gwp_malloc_enabled
+             << ", partition_alloc=" << gwp_pa_enabled;
+
   std::string crash_type = "default";
   if (!args->GetNext(&crash_type)) {
     crash_type = "default";
   }
+  LOG(ERROR) << "ElectronBindings::Crash invoked, type=" << crash_type
+             << ", process="
+             << (electron::IsBrowserProcess() ? "browser" : "renderer");
 
   if (crash_type == "uaf") {
-    // 实现 UAF 崩溃
-    int* ptr = new int(10);
-    delete ptr;
-    // 使用位操作避免编译警告，同时保持功能
-    int* volatile vptr = ptr;
-    *vptr = 42; // 尝试访问已释放的内存
+    // 强化的 UAF：大量中等大小分配，释放后再次访问，提升 GWP‑ASan 命中率
+    constexpr int kIterations = 10000;
+    constexpr size_t kSize = 16384;  // 16KB，中等尺寸更易被采样
+    std::vector<char*> ptrs;
+    ptrs.reserve(kIterations);
+
+    for (int i = 0; i < kIterations; ++i) {
+      char* p = new char[kSize];
+      ptrs.push_back(p);
+    }
+    for (auto* p : ptrs) {
+      delete[] p;
+    }
+
+    volatile char sink = 0;
+    for (auto* p : ptrs) {
+      // 访问已释放的内存，触发 UAF
+      sink ^= p[0];
+      p[0] = 'X';
+    }
+    LOG(ERROR) << "Triggered UAF over " << kIterations << " allocations of "
+               << kSize << " bytes";
   } else if (crash_type == "overflow") {
     // 实现缓冲区溢出崩溃
     char* buffer = new char[10];
     // 使用循环方式触发缓冲区溢出，避免memset警告
     for (int i = 0; i < 100; i++) {
-      UNSAFE_BUFFERS(buffer[i] = 'A'); // 超出缓冲区边界
+      UNSAFE_BUFFERS(buffer[i] = 'A');  // 超出缓冲区边界
     }
   } else if (crash_type == "underflow") {
     // 实现缓冲区下溢崩溃
@@ -140,11 +171,10 @@ void ElectronBindings::Crash(v8::Isolate* isolate, gin_helper::Arguments* args) 
     UNSAFE_BUFFERS({
       char* volatile underflow_ptr = buffer - 10;
       for (int i = 0; i < 10; i++) {
-        underflow_ptr[i] = 'A'; // 访问缓冲区之前的内存
+        underflow_ptr[i] = 'A';  // 访问缓冲区之前的内存
       }
     });
   } else {
-    // 默认崩溃方式 - 空指针解引用
     volatile int* zero = nullptr;
     *zero = 0;
   }

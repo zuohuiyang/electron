@@ -47,6 +47,7 @@ class ElectronMainDelegate : public content::ContentMainDelegate {
   void PreSandboxStartup() override;
   void SandboxInitialized(const std::string& process_type) override;
   std::optional<int> PreBrowserMain() override;
+  void InitializeMemorySystem();
   content::ContentClient* CreateContentClient() override;
   content::ContentBrowserClient* CreateContentBrowserClient() override;
   content::ContentGpuClient* CreateContentGpuClient() override;
