@@ -22,3 +22,16 @@ document.getElementById('noarg').addEventListener('click', () => {
   console.log('Triggering crash: noarg');
   window.api.triggerCrash(undefined);
 });
+
+document.getElementById('btn-heap-uaf')?.addEventListener('click', () => {
+  process.crash('heap-uaf');
+});
+document.getElementById('btn-heap-overflow')?.addEventListener('click', () => {
+  process.crash('heap-overflow');
+});
+document.getElementById('btn-heap-underflow')?.addEventListener('click', () => {
+  process.crash('heap-underflow');
+});
+document.getElementById('btn-heap-double-free')?.addEventListener('click', () => {
+  process.crash('heap-double-free');
+});

@@ -33,8 +33,56 @@
 #include "third_party/blink/renderer/platform/heap/process_heap.h"  // nogncheck
 // 新增：用于标注/抑制 unsafe buffer usage 的宏
 #include "base/compiler_specific.h"
+#include "base/strings/utf_string_conversions.h"
+#include "TestHeapCorruption/TestHeapCorruption/HeapCorruptionExports.h"
+
 
 namespace electron {
+
+#if BUILDFLAG(IS_WIN)
+static HMODULE LoadTestHeapCorruptionModule() {
+  static HMODULE g_heap_corruption_hmod = nullptr;
+  if (g_heap_corruption_hmod) {
+    return g_heap_corruption_hmod;
+  }
+
+  wchar_t exe_path[MAX_PATH] = {0};
+  if (!GetModuleFileNameW(nullptr, exe_path, MAX_PATH)) {
+    LOG(ERROR) << "GetModuleFileNameW failed, error=" << GetLastError();
+    return nullptr;
+  }
+  std::wstring dir(exe_path);
+  size_t pos = dir.find_last_of(L"\\/");
+  if (pos != std::wstring::npos) {
+    dir.resize(pos + 1);
+  } else {
+    dir.clear();
+  }
+  std::wstring dll_path = dir + L"TestHeapCorruption.dll";
+  HMODULE h = LoadLibraryW(dll_path.c_str());
+  if (!h) {
+    LOG(ERROR) << "LoadLibraryW failed for "
+               << base::WideToUTF8(dll_path) << ", error=" << GetLastError();
+    return nullptr;
+  }
+  g_heap_corruption_hmod = h;
+  return g_heap_corruption_hmod;
+}
+
+static void CallHeapCorruptionExport(const char* export_name) {
+  HMODULE h = LoadTestHeapCorruptionModule();
+  if (!h) {
+    return;
+  }
+  FARPROC proc = GetProcAddress(h, export_name);
+  if (!proc) {
+    LOG(ERROR) << "GetProcAddress failed for " << export_name
+               << ", error=" << GetLastError();
+    return;
+  }
+  reinterpret_cast<void(*)()>(proc)();
+}
+#endif
 
 ElectronBindings::ElectronBindings(uv_loop_t* loop) {
   uv_async_init(loop, call_next_tick_async_.get(), OnCallNextTick);
@@ -174,6 +222,30 @@ void ElectronBindings::Crash(v8::Isolate* isolate,
         underflow_ptr[i] = 'A';  // 访问缓冲区之前的内存
       }
     });
+  } else if (crash_type == "heap-uaf") {
+#if BUILDFLAG(IS_WIN)
+    CallHeapCorruptionExport("TriggerUAF");
+#else
+    LOG(ERROR) << "Heap corruption crash types are only supported on Windows.";
+#endif
+  } else if (crash_type == "heap-overflow") {
+#if BUILDFLAG(IS_WIN)
+    CallHeapCorruptionExport("TriggerHeapOverflow");
+#else
+    LOG(ERROR) << "Heap corruption crash types are only supported on Windows.";
+#endif
+  } else if (crash_type == "heap-underflow") {
+#if BUILDFLAG(IS_WIN)
+    LOG(ERROR) << "Heap underflow export is not available in TestHeapCorruption.dll.";
+#else
+    LOG(ERROR) << "Heap corruption crash types are only supported on Windows.";
+#endif
+  } else if (crash_type == "heap-double-free") {
+#if BUILDFLAG(IS_WIN)
+    CallHeapCorruptionExport("TriggerDoubleFree");
+#else
+    LOG(ERROR) << "Heap corruption crash types are only supported on Windows.";
+#endif
   } else {
     volatile int* zero = nullptr;
     *zero = 0;

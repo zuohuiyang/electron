@@ -18,6 +18,10 @@ In sandboxed renderers the `process` object contains only a subset of the APIs:
     * `'uaf'` - 使用已释放内存触发崩溃
     * `'overflow'` - 使用缓冲区上溢触发崩溃
     * `'underflow'` - 使用缓冲区下溢触发崩溃
+    * `'heap-uaf'` - 通过加载 TestHeapCorruption.dll 触发系统堆 UAF 崩溃（Windows）
+    * `'heap-overflow'` - 通过加载 TestHeapCorruption.dll 触发系统堆缓冲区上溢崩溃（Windows）
+    * `'heap-underflow'` - 通过加载 TestHeapCorruption.dll 触发系统堆缓冲区下溢崩溃（Windows）
+    * `'heap-double-free'` - 通过加载 TestHeapCorruption.dll 触发系统堆双重释放崩溃（Windows）
   
   导致当前进程的主线程崩溃。如果未提供`crashType`，则默认为空指针解引用。
 * `hang()`
