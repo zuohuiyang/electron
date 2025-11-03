@@ -24,14 +24,18 @@ document.getElementById('noarg').addEventListener('click', () => {
 });
 
 document.getElementById('btn-heap-uaf')?.addEventListener('click', () => {
-  process.crash('heap-uaf');
+  console.log('Triggering crash: heap-uaf');
+  window.api.triggerCrash('heap-uaf');
 });
 document.getElementById('btn-heap-overflow')?.addEventListener('click', () => {
-  process.crash('heap-overflow');
+  console.log('Triggering crash: heap-overflow');
+  window.api.triggerCrash('heap-overflow');
 });
 document.getElementById('btn-heap-underflow')?.addEventListener('click', () => {
-  process.crash('heap-underflow');
+  console.log('Triggering crash: heap-underflow');
+  window.api.triggerCrash('heap-underflow');
 });
 document.getElementById('btn-heap-double-free')?.addEventListener('click', () => {
-  process.crash('heap-double-free');
+  console.log('Triggering crash: heap-double-free');
+  window.api.triggerCrash('heap-double-free');
 });
