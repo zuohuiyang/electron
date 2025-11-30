@@ -116,7 +116,7 @@ void ElectronBindings::OnCallNextTick(uv_async_t* handle) {
 // static
 void ElectronBindings::Crash(v8::Isolate* isolate,
                              gin_helper::Arguments* args) {
-  // ÔÚ´¥·¢Ç°´òÓ¡ GWP-ASan µÄÆôÓÃ×´Ì¬£¨×¢ÒâÊ¹ÓÃ internal ÃüÃû¿Õ¼ä£©
+  // åœ¨è§¦å‘å‰æ‰“å° GWP-ASan çš„å¯ç”¨çŠ¶æ€ï¼ˆæ³¨æ„ä½¿ç”¨ internal å‘½åç©ºé—´ï¼‰
   bool gwp_malloc_enabled =
       base::FeatureList::IsEnabled(gwp_asan::internal::kGwpAsanMalloc);
   bool gwp_pa_enabled =
@@ -132,10 +132,10 @@ void ElectronBindings::Crash(v8::Isolate* isolate,
              << ", process="
              << (electron::IsBrowserProcess() ? "browser" : "renderer");
 
-  // ElectronBindings::Crash ÄÚµÄ "uaf" ·ÖÖ§
+  // ElectronBindings::Crash å†…çš„ "uaf" åˆ†æ”¯
   if (crash_type == "uaf") {
-    constexpr int kUafIterationCount = 1000000;
-    constexpr size_t kSize = 2048;  // 2KB£¬±£Ö¤Ğ¡ÓÚÏµÍ³Ò³´óĞ¡ÒÔ±ã±»²ÉÑù
+    constexpr int kUafIterationCount = 10000;
+    constexpr size_t kSize = 2048;
     for (int i = 0; i < kUafIterationCount; ++i) {
       LOG(INFO) << "[uaf_read] iteration " << (i + 1) << " / "
                 << kUafIterationCount;
@@ -144,7 +144,7 @@ void ElectronBindings::Crash(v8::Isolate* isolate,
       LOG(INFO) << "[uaf_read] ptr=" << static_cast<const void*>(p)
                 << " is_gpa=" << (is_gpa ? 1 : 0);
 
-      // ÊÍ·ÅºóÁ¢¼´·ÃÎÊ£¨UAF£©
+      // é‡Šæ”¾åç«‹å³è®¿é—®ï¼ˆUAFï¼‰
       delete[] p;
       LOG(INFO) << "Triggered UAF-READ begin";
 
@@ -161,20 +161,20 @@ void ElectronBindings::Crash(v8::Isolate* isolate,
                 << " bytes";
     }
   } else if (crash_type == "overflow") {
-    // ÊµÏÖ»º³åÇøÒç³ö±ÀÀ£
+    // å®ç°ç¼“å†²åŒºæº¢å‡ºå´©æºƒ
     char* buffer = new char[10];
-    // Ê¹ÓÃÑ­»··½Ê½´¥·¢»º³åÇøÒç³ö£¬±ÜÃâmemset¾¯¸æ
+    // ä½¿ç”¨å¾ªç¯æ–¹å¼è§¦å‘ç¼“å†²åŒºæº¢å‡ºï¼Œé¿å…memsetè­¦å‘Š
     for (int i = 0; i < 100; i++) {
-      UNSAFE_BUFFERS(buffer[i] = 'A');  // ³¬³ö»º³åÇø±ß½ç
+      UNSAFE_BUFFERS(buffer[i] = 'A');  // è¶…å‡ºç¼“å†²åŒºè¾¹ç•Œ
     }
   } else if (crash_type == "underflow") {
-    // ÊµÏÖ»º³åÇøÏÂÒç±ÀÀ£
+    // å®ç°ç¼“å†²åŒºä¸‹æº¢å´©æºƒ
     char* buffer = new char[10];
-    // ½«Ö¸ÕëËãÊõºÍĞ´Èë²Ù×÷°ü¹üÔÚ UNSAFE_TODO£¬±ÜÃâ±àÒëÆ÷¾¯¸æ
+    // å°†æŒ‡é’ˆç®—æœ¯å’Œå†™å…¥æ“ä½œåŒ…è£¹åœ¨ UNSAFE_TODOï¼Œé¿å…ç¼–è¯‘å™¨è­¦å‘Š
     UNSAFE_BUFFERS({
       char* volatile underflow_ptr = buffer - 10;
       for (int i = 0; i < 10; i++) {
-        underflow_ptr[i] = 'A';  // ·ÃÎÊ»º³åÇøÖ®Ç°µÄÄÚ´æ
+        underflow_ptr[i] = 'A';  // è®¿é—®ç¼“å†²åŒºä¹‹å‰çš„å†…å­˜
       }
     });
   } else {
