@@ -30,8 +30,9 @@ names are unchanged.
 ## Native modules and fuses
 
 Continue to build native modules for the target Electron version and architecture.
-The executable forwards the runtime's named exports to `main.dll`; applications
-should not change their native modules to link directly against that DLL.
+The executable preserves the runtime's named exports, primarily by forwarding them
+to `main.dll`. Some symbols linked into the launcher remain direct exports.
+Applications should not change their native modules to link directly against that DLL.
 
 Keep applying Electron fuses to the application executable. The executable passes
 its fuse configuration to the runtime. Apply fuse changes before the final signing
@@ -56,3 +57,15 @@ investigating these errors.
 
 If collecting symbols or diagnosing native crashes, retain symbols for both the
 executable and `main.dll`. The main runtime's code now belongs to the DLL module.
+
+## Startup prereading
+
+The executable synchronously prereads `main.dll` before loading it on browser
+launches. It skips explicit prereading when the process has a non-empty `--type`
+value or when `ELECTRON_RUN_AS_NODE` is present in the environment. A preread failure
+does not prevent the normal DLL load from being attempted.
+
+Prereading can reduce startup time when runtime pages need to be read from storage,
+but it also adds work when those pages are already cached. Evaluate both cold and
+warm launches with your application. Include the executable's loading and preread
+work in startup timing by measuring from process creation.

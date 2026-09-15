@@ -6,7 +6,9 @@
 
 #include "base/base_paths.h"
 #include "base/command_line.h"
+#include "base/environment.h"
 #include "base/files/file_path.h"
+#include "base/files/file_util.h"
 #include "base/logging.h"
 #include "base/path_service.h"
 #include "content/public/app/sandbox_helper_win.h"
@@ -24,6 +26,17 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, wchar_t* cmd, int) {
 
   sandbox::SandboxInterfaceInfo sandbox_info = {nullptr};
   content::InitializeSandboxInfo(&sandbox_info);
+
+  // Only preread browser launches. Conservatively skip Node launches even when
+  // their RunAsNode fuse may have been disabled in the executable.
+  if (base::CommandLine::ForCurrentProcess()
+          ->GetSwitchValueASCII("type")
+          .empty() &&
+      !base::Environment::Create()->HasVar("ELECTRON_RUN_AS_NODE")) {
+    // A failed preread must not prevent the normal DLL load below.
+    base::PreReadFile(runtime_path, /*is_executable=*/true,
+                      /*sequential=*/false);
+  }
 
   // Keep the runtime loaded through CRT shutdown, including addon destructors.
   HMODULE runtime = ::LoadLibraryExW(
