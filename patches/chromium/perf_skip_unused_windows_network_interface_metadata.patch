@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: zuohuiyang <zuohuiyang@foxmail.com>
+Date: Sat, 26 Sep 2026 13:15:00 +0800
+Subject: perf: avoid unused address and DNS metadata in Windows network lists
+
+GetNetworkListImpl consumes adapter metadata and unicast addresses only.
+Do not collect anycast, multicast, DNS server or DNS suffix information.
+This avoids DNS-service RPCs and can keep the response in the initial buffer.
+Connection-type initialization remains synchronous and retains its semantics.
+diff --git a/net/base/network_interfaces_win.cc b/net/base/network_interfaces_win.cc
+index d273eaaf76f75..e07bd52b3ac84 100644
+--- a/net/base/network_interfaces_win.cc
++++ b/net/base/network_interfaces_win.cc
+@@ -236,5 +236,9 @@ bool GetNetworkList(NetworkInterfaceList* networks, int policy) {
+   ULONG len = INITIAL_BUFFER_SIZE;
+-  ULONG flags = 0;
++  // GetNetworkListImpl only consumes unicast addresses and adapter metadata.
++  // Avoid collecting unused address lists and DNS configuration, which can
++  // require cross-process calls and force a second call with a larger buffer.
++  ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
++                GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_DNS_INFO;
+   // Initial buffer allocated on stack.
+   char initial_buf[INITIAL_BUFFER_SIZE];
+   // Dynamic buffer in case initial buffer isn't large enough.
