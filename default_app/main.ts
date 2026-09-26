@@ -1,10 +1,11 @@
-import * as electron from 'electron/main';
-
 import * as fs from 'node:fs';
 import { Module } from 'node:module';
 import * as path from 'node:path';
 import * as url from 'node:url';
 
+// Keep Electron's API getters lazy. An ESM namespace import evaluates every
+// export, initializing APIs that the application may never use.
+const electron = Module.createRequire(import.meta.url)('electron/main') as typeof import('electron/main');
 const { app, dialog } = electron;
 
 type DefaultAppOptions = {
