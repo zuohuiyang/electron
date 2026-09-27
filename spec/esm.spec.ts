@@ -29,6 +29,14 @@ const fixturePath = path.resolve(import.meta.dirname, 'fixtures', 'esm');
 
 describe('esm', () => {
   describe('main process', () => {
+    for (const entrypoint of ['lazy-api.cjs', 'lazy-api.mjs']) {
+      it(`should leave unused launcher APIs lazy for ${entrypoint}`, async () => {
+        const result = await runFixture(path.resolve(fixturePath, entrypoint));
+        expect(result.code).to.equal(0, result.stderr);
+        expect(result.stdout).to.equal('Lazy API first access and import / require parity');
+      });
+    }
+
     it('should load an esm entrypoint', async () => {
       const result = await runFixture(path.resolve(fixturePath, 'entrypoint.mjs'));
       expect(result.code).to.equal(0);

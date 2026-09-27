@@ -1,10 +1,12 @@
-import * as electron from 'electron/main';
-
 import * as fs from 'node:fs';
-import { Module } from 'node:module';
+import { createRequire, Module } from 'node:module';
 import * as path from 'node:path';
 import * as url from 'node:url';
 
+const require = createRequire(import.meta.url);
+// Electron's ESM translator reads every export, triggering the CommonJS API
+// getters. Use require() to keep APIs this launcher does not use lazy.
+const electron = require('electron/main') as typeof import('electron/main');
 const { app, dialog } = electron;
 
 type DefaultAppOptions = {
