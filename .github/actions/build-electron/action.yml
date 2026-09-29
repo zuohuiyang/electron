@@ -203,6 +203,7 @@ runs:
         IS_RELEASE: ${{ inputs.is-release }}
         ARTIFACT_PLATFORM: ${{ inputs.artifact-platform }}
         TARGET_ARCH: ${{ inputs.target-arch }}
+        GENERATE_TEST_ARTIFACTS: ${{ inputs.generate-test-artifacts }}
       run: |
         cd src\electron
         git pack-refs
@@ -211,10 +212,11 @@ runs:
         $env:NINJA_SUMMARIZE_BUILD = 1
         $env:NO_COLOR = 1
         $quietFlag = if ($env:ACTIONS_STEP_DEBUG -eq "true" -or $env:IS_RELEASE -eq "true") { @() } else { @("-quiet") }
+        $extraTargets = if ($env:GENERATE_TEST_ARTIFACTS -eq "true") { @("electron:dll_blocker_tests") } else { @() }
         if ($env:IS_RELEASE -eq "true") {          
-          e build --target electron:release_build
+          e build --target electron:release_build @extraTargets
         } else {
-          e build --target electron:testing_build $quietFlag
+          e build --target electron:testing_build @extraTargets $quietFlag
         }
         if ($LASTEXITCODE -ne 0) {
           Write-Host "e build failed with exit code $LASTEXITCODE"

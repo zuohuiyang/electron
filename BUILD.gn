@@ -2106,6 +2106,16 @@ group("electron") {
   public_deps = [ ":electron_app" ]
 }
 
+if (is_win) {
+  group("dll_blocker_tests") {
+    testonly = true
+    deps = [
+      ":electron_app",
+      "//electron/spec/fixtures/dll-block:dll_blocker_test_helper",
+    ]
+  }
+}
+
 ##### node_headers
 
 node_dir = "../third_party/electron_node"

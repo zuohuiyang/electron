@@ -1,0 +1,13 @@
+assert(is_win)
+
+shared_library("dll_blocker_test_library") {
+  testonly = true
+  sources = [ "library.cc" ]
+}
+
+executable("dll_blocker_test_helper") {
+  testonly = true
+  sources = [ "helper.cc" ]
+  deps = [ "//base:compiler_specific" ]
+  data_deps = [ ":dll_blocker_test_library" ]
+}

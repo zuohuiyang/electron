@@ -34,6 +34,10 @@ mv_if_exist ffmpeg.zip src/out/ffmpeg
 mv_if_exist hunspell_dictionaries.zip src/out/Default
 mv_if_exist xcache.zip src/out/Default
 mv_if_exist cross-arch-snapshots src
+if [ "$BUILD_TYPE" == "win" ]; then
+  mv_if_exist dll_blocker_test_helper.exe src/out/Default
+  mv_if_exist dll_blocker_test_library.dll src/out/Default
+fi
 
 echo Restoring artifacts from $SRC_ARTIFACTS
 

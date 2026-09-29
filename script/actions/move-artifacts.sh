@@ -114,6 +114,10 @@ mv_if_exist src/out/Default/xcache.zip
 mv_if_exist src/cross-arch-snapshots
 cp_if_exist src/out/electron_ninja_log
 cp_if_exist src/out/Default/.ninja_log
+if [ "$BUILD_TYPE" == "win" ]; then
+  cp_if_exist src/out/Default/dll_blocker_test_helper.exe
+  cp_if_exist src/out/Default/dll_blocker_test_library.dll
+fi
 if [ -n "$SISO_REPORT_PATH" ]; then
   cp_if_exist "$SISO_REPORT_PATH"
 fi
