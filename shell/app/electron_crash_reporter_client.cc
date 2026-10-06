@@ -190,6 +190,29 @@ void ElectronCrashReporterClient::RegisterWerHelperModuleForCurrentUser() {
     key.WriteValue(path.value().c_str(), DWORD{0});
   }
 }
+
+// static
+bool ElectronCrashReporterClient::UnregisterWerHelperModuleForCurrentUser() {
+  electron::ScopedAllowBlockingForElectron allow_blocking;
+  const base::FilePath path = GetWerHelperPath();
+  if (path.empty())
+    return false;
+
+  base::win::RegKey key;
+  const LONG open_result =
+      key.Open(HKEY_CURRENT_USER, kWerHelperRegistryKey, KEY_SET_VALUE);
+  if (open_result == ERROR_FILE_NOT_FOUND ||
+      open_result == ERROR_PATH_NOT_FOUND)
+    return true;
+  if (open_result != ERROR_SUCCESS)
+    return false;
+
+  // Delete only the value for this exact helper path. The key is shared with
+  // other applications and may also contain other installations of this app.
+  const LONG delete_result = key.DeleteValue(path.value().c_str());
+  return delete_result == ERROR_SUCCESS ||
+         delete_result == ERROR_FILE_NOT_FOUND;
+}
 #endif
 
 #if BUILDFLAG(IS_WIN)

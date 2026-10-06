@@ -57,7 +57,8 @@ Electron process. The helper is looked up as `<executable name>_wer.dll` next
 to the executable, so if you rename `electron.exe` to `myapp.exe` when
 packaging, rename `electron_wer.dll` to `myapp_wer.dll` as well. Installers
 that write to `HKEY_LOCAL_MACHINE` may list it there instead. To opt out, do
-not ship the DLL.
+not ship the DLL. During uninstall, call `crashReporter.cleanup()` to remove
+the current user's registry value for this helper.
 
 ## Methods
 
@@ -112,8 +113,8 @@ changes:
     precedence. By default, `productName` and the app version are included, as
     well as the Electron version.
 
-This method must be called before using any other `crashReporter` APIs. Once
-initialized this way, the crashpad handler collects crashes from all
+This method must be called before using any other `crashReporter` APIs except
+`cleanup()`. Once initialized this way, the crashpad handler collects crashes from all
 subsequently created processes. The crash reporter cannot be disabled once
 started.
 
@@ -136,6 +137,32 @@ by the crash reporter.
 > must be at most 39 bytes long, and values must be no longer than 127 bytes.
 > Keys with names longer than the maximum will be silently ignored. Key values
 > longer than the maximum length will be truncated.
+
+> [!NOTE]
+> This method is only available in the main process.
+
+### `crashReporter.cleanup()`
+
+Returns `boolean` - Whether cleanup succeeded. Returns `true` if the registration
+was already absent, and `false` if the helper path could not be resolved or a
+registry operation failed.
+
+Cleans up persistent system registration created by the crash reporter. Call
+this method from your app's uninstall handler, before exiting the app.
+
+On Windows, this removes the value for the current helper's full path from
+`HKEY_CURRENT_USER\Software\Microsoft\Windows\Windows Error Reporting\RuntimeExceptionHelperModules`.
+The helper does not need to exist on disk. Other registry values, including those
+for older versions or other installations, and the shared registry key are left
+untouched. Registrations under `HKEY_LOCAL_MACHINE` must be removed by the
+installer that created them. On other platforms, this method does nothing and
+returns `true`.
+
+This method can be called before `start()` and before the app's `ready` event.
+It does not stop the crash reporter, reset its options, or delete crash reports.
+Removing the Windows registration prevents WER from loading the helper for
+crashes that bypass the in-process handler. Use it only when uninstalling.
+Calling it repeatedly is safe.
 
 > [!NOTE]
 > This method is only available in the main process.

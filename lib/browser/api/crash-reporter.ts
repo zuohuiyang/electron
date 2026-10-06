@@ -48,6 +48,10 @@ class CrashReporter implements Electron.CrashReporter {
     );
   }
 
+  cleanup(): boolean {
+    return binding.cleanup();
+  }
+
   getLastCrashReport() {
     const reports = this.getUploadedReports().sort((a, b) => {
       const ats = a && a.date ? new Date(a.date).getTime() : 0;

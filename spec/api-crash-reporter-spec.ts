@@ -140,6 +140,66 @@ function waitForNewFileInDir(dir: string): Promise<string[]> {
 }
 
 ifdescribe(!process.mas && !process.env.DISABLE_CRASH_REPORTER_TESTS)('crashReporter module', function () {
+  describe('cleanup()', () => {
+    const key = 'HKCU\\Software\\Microsoft\\Windows\\Windows Error Reporting\\RuntimeExceptionHelperModules';
+    const helper = path.join(path.dirname(process.execPath), `${path.basename(process.execPath, '.exe')}_wer.dll`);
+    const reg = (...args: string[]) => childProcess.spawnSync('reg.exe', args, { encoding: 'utf8' });
+    let previousData: string | undefined;
+
+    beforeEach(() => {
+      if (process.platform !== 'win32') return;
+      const previous = reg('query', key, '/v', helper);
+      previousData = previous.stdout.match(/REG_DWORD\s+(0x[0-9a-f]+)/i)?.[1];
+      // Preserve the test runner's registration, including when a child calls
+      // cleanup() before ready. Refuse to overwrite an unexpected value type.
+      if (previous.status === 0) expect(previousData).to.be.a('string');
+      defer(() => {
+        const restored = previousData
+          ? reg('add', key, '/v', helper, '/t', 'REG_DWORD', '/d', previousData, '/f')
+          : reg('delete', key, '/v', helper, '/f');
+        if (previousData) expect(restored.status, restored.stderr).to.equal(0);
+      });
+    });
+
+    it('can be called before ready and without starting the crash reporter', async () => {
+      const appPath = path.join(import.meta.dirname, 'fixtures', 'apps', 'crash-reporter-cleanup');
+      const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) => {
+        childProcess.execFile(process.execPath, [appPath], (error, stdout) => {
+          if (error) reject(error);
+          else resolve({ stdout });
+        });
+      });
+      expect(JSON.parse(stdout.trim())).to.deep.equal({ ready: false, results: [true, true] });
+    });
+
+    ifit(process.platform === 'win32')('removes only the current helper registry value', async () => {
+      const otherHelper = path.join(os.tmpdir(), randomUUID(), path.basename(helper));
+      const added = reg('add', key, '/v', helper, '/t', 'REG_DWORD', '/d', '0', '/f');
+      expect(added.status, added.stderr).to.equal(0);
+      const otherAdded = reg('add', key, '/v', otherHelper, '/t', 'REG_DWORD', '/d', '0', '/f');
+      expect(otherAdded.status, otherAdded.stderr).to.equal(0);
+      defer(() => reg('delete', key, '/v', otherHelper, '/f'));
+
+      const { remotely } = await startRemoteControlApp();
+      expect(await remotely(() => require('electron').crashReporter.cleanup())).to.be.true();
+      expect(reg('query', key, '/v', helper).status).to.equal(1);
+      expect(reg('query', key, '/v', otherHelper).status).to.equal(0);
+      expect(reg('query', key).status).to.equal(0);
+      expect(await remotely(() => require('electron').crashReporter.cleanup())).to.be.true();
+    });
+
+    it('does not reset the crash reporter upload setting or parameters', async () => {
+      const { remotely } = await startRemoteControlApp();
+      const result = await remotely(() => {
+        const { crashReporter } = require('electron');
+        crashReporter.start({ uploadToServer: false, extra: { cleanupTest: 'retained' } });
+        const cleaned = crashReporter.cleanup();
+        return { cleaned, upload: crashReporter.getUploadToServer(), extra: crashReporter.getParameters().cleanupTest };
+      });
+      expect(result).to.deep.equal({ cleaned: true, upload: false, extra: 'retained' });
+    });
+  });
+
   describe('should send minidump', () => {
     it('when renderer crashes', async () => {
       const { port, waitForCrash } = await startServer();

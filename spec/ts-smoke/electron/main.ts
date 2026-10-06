@@ -1104,6 +1104,8 @@ crashReporter.start({
 
 console.log(crashReporter.getLastCrashReport());
 console.log(crashReporter.getUploadedReports());
+const cleanupSucceeded: boolean = crashReporter.cleanup();
+console.log(cleanupSucceeded);
 
 // nativeImage
 // https://github.com/electron/electron/blob/main/docs/api/native-image.md

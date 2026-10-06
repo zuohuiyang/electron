@@ -251,6 +251,14 @@ void SetUploadToServer(bool upload) {
 #endif
 }
 
+bool Cleanup() {
+#if BUILDFLAG(IS_WIN)
+  return ElectronCrashReporterClient::UnregisterWerHelperModuleForCurrentUser();
+#else
+  return true;
+#endif
+}
+
 bool GetUploadToServer() {
 #if IS_MAS_BUILD()
   return false;
@@ -274,6 +282,7 @@ void Initialize(v8::Local<v8::Object> exports,
   v8::Isolate* const isolate = electron::JavascriptEnvironment::GetIsolate();
   gin_helper::Dictionary dict(isolate, exports);
   dict.SetMethod("start", &electron::api::crash_reporter::Start);
+  dict.SetMethod("cleanup", &Cleanup);
 #if IS_MAS_BUILD()
   dict.SetMethod("addExtraParameter", &electron::api::crash_reporter::NoOp);
   dict.SetMethod("removeExtraParameter", &electron::api::crash_reporter::NoOp);

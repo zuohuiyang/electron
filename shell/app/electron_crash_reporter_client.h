@@ -50,6 +50,11 @@ class ElectronCrashReporterClient : public crash_reporter::CrashReporterClient {
   // DLLs listed there (HKCU or HKLM). Call once from the browser process
   // before crashpad is initialized; may block.
   static void RegisterWerHelperModuleForCurrentUser();
+
+  // Removes this helper's persistent HKCU registration during app uninstall.
+  // Does not require crashpad initialization or the DLL to exist; may block.
+  // Returns true if the value was removed or was already absent.
+  static bool UnregisterWerHelperModuleForCurrentUser();
 #endif
 
 #if BUILDFLAG(IS_WIN)
