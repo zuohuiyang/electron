@@ -71,6 +71,23 @@ ifdescribe(fs.existsSync(xcache) && !process.env.IS_UBSAN)('electron_xcache', ()
     expect(info.header.roSnapshotChecksum).toBe('0x' + own.readUInt32LE(52).toString(16).padStart(8, '0'));
   });
 
+  if (process.platform === 'win32') {
+    it('finds the runtime snapshot when passed electron.exe', () => {
+      const { info, cache } = generate('1', '--snapshot', process.execPath);
+      const direct = generate('1');
+      expect(info.snapshot.file).toBe(snapshotHolder);
+      expect(cache).toEqual(direct.cache);
+    });
+
+    it('reports a missing runtime DLL next to electron.exe', () => {
+      const launcher = path.join(tmp, 'electron.exe');
+      fs.copyFileSync(process.execPath, launcher);
+      const result = childProcess.spawnSync(xcache, ['--snapshot', launcher, '--list'], { encoding: 'utf8' });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(`cannot read ${path.join(tmp, 'electron_runtime.dll')}`);
+    });
+  }
+
   it('reports the complete SHA256 source hash', () => {
     const { info, cache } = generate(
       '1',
